@@ -1,11 +1,12 @@
 // Performs comprehensive tests of sfig functionality.
+// This file is currently a mess.
 
 // Initialize
 sfig.latexMacro('name', 0, '\\text{foo}');
 sfig.enableProfiling = true;
 sfig.enableTiming = true;
 sfig.initialize();
-sfig.importMethods(this, ['_', 'pause', 'home', 'bulletedText', 'center', 'textBox', 'raw', 'rawAddHtml', 'rawAddSvg', 'circle', 'square', 'rect', 'arrow', 'line', 'polyline', 'text', 'xtable', 'ytable', 'table', 'frame', 'transform', 'overlay', 'image', 'wrap', 'slide']);
+sfig.importMethods(this, ['_', 'pause', 'home', 'parentCenter', 'bulletedText', 'center', 'textBox', 'raw', 'rawAddHtml', 'rawAddSvg', 'circle', 'square', 'rect', 'arrow', 'line', 'polyline', 'text', 'xtable', 'ytable', 'table', 'frame', 'transform', 'overlay', 'image', 'wrap', 'slide']);
 
 var prez = sfig.presentation();
 function addToPrez(block) { prez.addSlide(home(block)); }
@@ -25,51 +26,42 @@ function testCase(block, elemStr) {
   addToPrez(overlay(trueMarker, trueBlock));
 }
 
+function assertEquals(a, b) {
+  if (a != b) throw 'Assertion failed: '+a+' != '+b;
+}
 function thunkTest() {
+  sfig.importMethods(this, ['tconstant', 'tfunc']);
   var x = tconstant(4);
   var y = tconstant(5);
   var z = x.add(y);
-  L(z.get(), 9);
-  L(z.value, 9);  // Should be cached
+  assertEquals(z.get(), 9);
+  assertEquals(z.value, 9);  // Should be cached
 
   x.set(1);  // This should affect z which uses x
-  L(z.value, null);  // Should be invalidated
-  L(z.get(), 6);
+  assertEquals(z.value, null);  // Should be invalidated
+  assertEquals(z.get(), 6);
 
   x.set(y.mul(2));
-  L(z.get(), 15);
+  assertEquals(z.get(), 15);
 
   y.set(10);
-  L(z.get(), 30);
+  assertEquals(z.get(), 30);
 
-  var p = new Properties();
+  var p = new sfig.Properties();
   p.setProperty('x', 5);
   p.setProperty('y', p.getProperty('x').mul(2));
-  L(p.getProperty('y').get(), 10);
+  assertEquals(p.getProperty('y').get(), 10);
   p.setProperty('x', 3);
-  L(p.getProperty('y').get(), 6);
+  assertEquals(p.getProperty('y').get(), 6);
 }
+thunkTest();
 
 function createSlides() {
-  var numRows = 30, numCols = 60;
-  var matrix = [];
-  var items = []
-  for (var r = 0; r < numRows; r++) {
-    matrix[r] = [];
-    for (var c = 0; c < numCols; c++) {
-      matrix[r][c] = circle(10);
-      items.push(matrix[r][c].shift(r*30, c*30));
-    }
-  }
-  addToPrez(new sfig.Overlay(items));
-  //addToPrez(new sfig.Table(matrix).margin(5));
-  return;
-
   // Wrapping
   addToPrez(slide('A test of word wrapping',
     bulletedText('This is a really long sentence that keeps on going and going, but fortunately we have word wrap which prevents this sentence from going off the screen.'),
     bulletedText('Here is a nice rectangle:'),
-    center(rect(80, 40)),
+    parentCenter(rect(80, 40)),
     bulletedText('After that sentence, some math: $\\frac{3}{4}$.'),
   _));
 
@@ -79,7 +71,7 @@ function createSlides() {
     var t = textBox().size(50, 10).content('circle(10).color(\'blue\')').selection(1, 2).onEnter(function(box) {
       var input = box.content().get();
       var output = eval(input);
-      L('eval', input, output);
+      console.log('eval', input, output);
       output = sfig.std(output);
       o.resetContent(output);
       prez.refresh(function() { t.textElem.focus(); });
@@ -124,13 +116,19 @@ function createSlides() {
     //Raphael(container).linechart(0, 0, 600, 400, [1, 2, 3], [[2, 9, 5], [4, 5, 9]], {axis: '0 0 1 1', axisxstep: 10});
   })));
 
-  addToPrez(frame(text('hello this is a test $\\sqrt{x}$').width(100)).padding(5).bg.strokeWidth(1).end);
-
+  // Add raw HTML
   addToPrez(frame(rawAddHtml(100, 100, function(container) {
     container.appendChild(document.createTextNode('hello this is a test and it goes on and on'));
   })).bg.strokeWidth(1).end.padding(5).scale(2));
 
-  addToPrez(text('$x^2 + \\cssId{foo}{y}$'));
+  // Add events to parts
+  addToPrez(text('$x^2 \\cssId{foo}{+ y - y}$')
+      .tooltip('equation')
+      .partTooltip('foo', 'irrelevant')  // Doesn't work
+      .partOnClick('foo', function(x, div) {
+    sfig.L('clicked');
+    div.style.display = 'none';
+  }));
 
   var p = d3.select("body").selectAll("p")
         .data([4, 8, 15, 16, 23, 42])
@@ -138,17 +136,7 @@ function createSlides() {
   p.enter().append("p").text(String);
   p.exit().remove();
 
-  // Javascript evaluator of expressions
-  t = textBox().size(50, 10).content('3+4').onEnter(function(box) {
-    var input = box.content().get();
-    var output = eval(input);
-    L('eval', input, output);
-  })
-  prez.addSlide(t);
-
   // Align
-  prez.addSlide(ytable(textBox().numCols(20), textBox().numCols(30)));
-
   prez.addSlide(home(overlay(
     circle(30), pause(),
     circle(50).onShow(function() { console.log('show circle'); }),
@@ -157,7 +145,7 @@ function createSlides() {
   // Replace
   testCase(xtable(c1 = circle(30), pause(), circle(50).replace(c1)));
 
-  // Animate (doesn't work in Chrome)
+  // Animate (doesn't work properly in Chrome unless refreshed from this page)
   prez.addSlide(square(30).color('blue'));
   prez.addSlide(square(30).animate.scale(0.5).end);
 
@@ -174,7 +162,6 @@ function createSlides() {
     var button = circle(30).fillColor('red');
     button.onClick(function() {
       container.resetContent(square(200));
-      button.invalidateRender();
       prez.refresh();
     });
     prez.addSlide(home(overlay(container, button).center()));
@@ -221,6 +208,20 @@ function createSlides() {
   testCase(T('a', 'b', 'c').verticalCenterEdges(true), '<g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><rect width="22" height="41" style="stroke: #000000; fill: none; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(11,20.5)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g transform="translate(-11,-20.5)" style=""><rect width="22" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-7.5,-17)" style=""><foreignObject width="15" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">b</div></foreignObject></g></g></g></g></g></g></g></g></g></g></g></g></g></g><g transform="translate(52,0)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><rect width="20" height="41" style="stroke: #000000; fill: none; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(10,20.5)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g transform="translate(-10,-20.5)" style=""><rect width="20" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-6.5,-17)" style=""><foreignObject width="13" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">c</div></foreignObject></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g><g style=""><g style=""><g transform="translate(36.5,-30)" style=""><g transform="translate(0,-20.5)" style=""><g style=""><g style=""><g style=""><g transform="translate(-10,-20.5)" style=""><rect width="20" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-6.5,-17)" style=""><foreignObject width="13" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">a</div></foreignObject></g></g></g></g></g></g></g></g><g style=""><g style=""><g style=""><line x1="36.5" y1="-30" x2="11" y2="0" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g><g style=""><g style=""><g style=""><line x1="36.5" y1="-30" x2="62" y2="0" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g></g></g>');
   testCase(T('a', 'b', 'c'), '<g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><rect width="22" height="41" style="stroke: #000000; fill: none; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(11,20.5)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g transform="translate(-11,-20.5)" style=""><rect width="22" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-7.5,-17)" style=""><foreignObject width="15" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">b</div></foreignObject></g></g></g></g></g></g></g></g></g></g></g></g></g></g><g transform="translate(52,0)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><rect width="20" height="41" style="stroke: #000000; fill: none; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(10,20.5)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g transform="translate(-10,-20.5)" style=""><rect width="20" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-6.5,-17)" style=""><foreignObject width="13" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">c</div></foreignObject></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g><g style=""><g style=""><g transform="translate(36.5,-30)" style=""><g transform="translate(0,-20.5)" style=""><g style=""><g style=""><g style=""><g transform="translate(-10,-20.5)" style=""><rect width="20" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-6.5,-17)" style=""><foreignObject width="13" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">a</div></foreignObject></g></g></g></g></g></g></g></g><g style=""><g style=""><g style=""><line x1="28.816901408450708" y1="-31" x2="17.683098591549296" y2="0" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g><g style=""><g style=""><g style=""><line x1="43.183098591549296" y1="-31" x2="54.3169014084507" y2="0" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g></g></g>');
   testCase(T('a', B(frame('3').bg.fillColor('white').end.scale(0.5), 'b')), '<g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><rect width="22" height="41" style="stroke: #000000; fill: none; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(11,20.5)" style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g style=""><g transform="translate(-11,-20.5)" style=""><rect width="22" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-7.5,-17)" style=""><foreignObject width="15" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">b</div></foreignObject></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g></g><g style=""><g style=""><g transform="translate(11,-30)" style=""><g transform="translate(0,-20.5)" style=""><g style=""><g style=""><g style=""><g transform="translate(-10,-20.5)" style=""><rect width="20" height="41" rx="5" ry="5" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g style=""><g transform="translate(-6.5,-17)" style=""><foreignObject width="13" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">a</div></foreignObject></g></g></g></g></g></g></g></g><g style=""><g style=""><g style=""><line x1="10.500000000000002" y1="-31" x2="10.499999999999996" y2="0" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g><g style=""><g style=""><g transform="translate(10.5,-15.5)" style=""><g style=""><g transform="scale(0.5,0.5)" style=""><g style=""><g style=""><g transform="translate(-8,-17.5)" style=""><rect width="16" height="35" style="stroke: #000000; fill: #ffffff; stroke-width: 0px; "></rect></g></g><g style=""><g transform="translate(-7.5,-17)" style=""><foreignObject width="15" height="34" style="fill: none; stroke-width: 1px; "><div style="display: inline-block; height: auto; width: auto; float: left; font-family: \'Times New Roman\'; font-size: 28px; color: black; ">3</div></foreignObject></g></g></g></g></g></g></g></g></g></g>');
+
+  // Big matrix
+  var numRows = 20, numCols = 20;
+  var matrix = [];
+  var items = []
+  for (var r = 0; r < numRows; r++) {
+    matrix[r] = [];
+    for (var c = 0; c < numCols; c++) {
+      matrix[r][c] = circle(10);
+      items.push(matrix[r][c].shift(r*30, c*30));
+    }
+  }
+  addToPrez(new sfig.Overlay(items));  // Faster
+  //addToPrez(new sfig.Table(matrix).margin(5));
 
   // Events
   o = square(50).color('green');

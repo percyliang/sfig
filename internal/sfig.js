@@ -643,6 +643,18 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addProperty(Block, 'onMouseout', null, 'Function to call when mouse moves out of object.');
   sfig_.addProperty(Block, 'onShow', null, 'Function to call when object is shown.');
 
+  Block.prototype.partOnClick = function(id, value) {
+    if (!this.partOnClickMap) this.partOnClickMap = {};
+    this.partOnClickMap[id] = value;
+    return this;
+  }
+
+  Block.prototype.partTooltip = function(id, value) {
+    if (!this.partTooltipMap) this.partTooltipMap = {};
+    this.partTooltipMap[id] = value;
+    return this;
+  }
+
   // Derived properties
   // The bounding box of this object as perceived by the outside world
   // for purposes of layout (doesn't actually have to be the real bounding
@@ -962,6 +974,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // Delete everything
     function recurse(block) {
+      block.getBlocksVisited = null;
       block.elem = null;
       block.hasAnimation = null;
       block.children.forEach(recurse);
@@ -1029,6 +1042,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.elem.style.pointerEvents = 'all';
 
     // Add additional properties
+    // TODO: works in Chrome, but doesn't work in Firefox
     if (this.tooltip().get() != null) {
       var title = sfig_.newSvgElem('title');
       title.textContent = this.tooltip().get();
@@ -1037,6 +1051,23 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (this.onClick().get() != null) this.elem.onclick = sfig_.funcPrependArg(this.onClick().get(), this);
     if (this.onMouseover().get() != null) this.elem.onmouseover = sfig_.funcPrependArg(this.onMouseover().get(), this);
     if (this.onMouseout().get() != null) this.elem.onmouseout = sfig_.funcPrependArg(this.onMouseout().get(), this);
+
+    if (this.partTooltipMap) {
+      for (var id in this.partTooltipMap) {
+        var partElem = document.getElementById(id);
+        var title = sfig_.newElem('title');
+        title.innerHTML = this.partTooltipMap[id];
+        partElem.appendChild(title);
+      }
+    }
+    if (this.partOnClickMap) {
+      for (var id in this.partOnClickMap) {
+        var partElem = document.getElementById(id);
+        var self = this;
+        //partElem.style.pointerEvents = 'all';
+        partElem.onclick = function() { self.partOnClickMap[id](self, partElem); };
+      }
+    }
 
     this.addAnimations(this.elem);
 
