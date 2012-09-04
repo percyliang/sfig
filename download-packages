@@ -6,18 +6,6 @@ mkdir -p external
 # MathJax: for rendering math
 wget --no-check-certificate -c http://github.com/mathjax/MathJax/zipball/v2.0-latest -O MathJax-2.0.zip && unzip -q MathJax-2.0.zip && mv mathjax-MathJax-07669ac external/MathJax
 
-# d3: for fancy visualization
+# d3: for visualization
 wget --no-check-certificate -c http://d3js.org/d3.v2.min.js -O external/d3.v2.min.js
 wget --no-check-certificate -c http://d3js.org/d3.v2.js -O external/d3.v2.js
-
-# Grafico: for drawing graphs
-wget --no-check-certificate -c http://grafico.kilianvalkhof.com/packaged/grafico.min.js -O external/grafico.min.js
-wget --no-check-certificate -c https://ajax.googleapis.com/ajax/libs/prototype/1.7.1.0/prototype.js -O external/prototype.js
-wget --no-check-certificate -c http://github.com/DmitryBaranovskiy/raphael/raw/master/raphael-min.js -O external/raphael.min.js
-wget --no-check-certificate -c http://github.com/DmitryBaranovskiy/raphael/raw/master/raphael.js -O external/raphael.js
-
-# gRaphael: for drawing graphs
-wget --no-check-certificate -c https://raw.github.com/DmitryBaranovskiy/g.raphael/master/min/g.raphael-min.js -O external/g.raphael-min.js
-wget --no-check-certificate -c 'http://github.com/DmitryBaranovskiy/g.raphael/blob/master/min/g.line-min.js?raw=true' -O external/g.line-min.js
-wget --no-check-certificate -c 'http://github.com/DmitryBaranovskiy/g.raphael/blob/master/min/g.pie-min.js?raw=true' -O external/g.pie-min.js
-wget --no-check-certificate -c 'http://github.com/DmitryBaranovskiy/g.raphael/blob/master/min/g.bar-min.js?raw=true' -O external/g.bar-min.js

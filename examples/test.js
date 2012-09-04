@@ -6,10 +6,16 @@ sfig.latexMacro('name', 0, '\\text{foo}');
 sfig.enableProfiling = true;
 sfig.enableTiming = true;
 sfig.initialize();
-sfig.importMethods(this, ['_', 'pause', 'home', 'parentCenter', 'bulletedText', 'center', 'textBox', 'raw', 'rawAddHtml', 'rawAddSvg', 'circle', 'square', 'rect', 'arrow', 'line', 'polyline', 'text', 'xtable', 'ytable', 'table', 'frame', 'transform', 'overlay', 'image', 'wrap', 'slide']);
+sfig.importMethods(this, [
+  '_', 'pause', 'home', 'parentCenter', 'bulletedText',
+  'center', 'textBox', 'raw', 'rawAddHtml', 'rawAddSvg',
+  'circle', 'square', 'rect', 'arrow', 'line', 'polyline', 'text',
+  'xtable', 'ytable', 'table', 'frame', 'transform', 'overlay', 'image', 'wrap', 'slide',
+  'lineGraph', 'Graph',
+]);
 
 var prez = sfig.presentation();
-function addToPrez(block) { prez.addSlide(home(block)); }
+function addToPrez(block) { addToPrez(block); }
 
 function testCase(block, elemStr) {
   var marker = circle(2).opacity(0.5).color('red');
@@ -76,24 +82,11 @@ function createSlides() {
       o.resetContent(output);
       prez.refresh(function() { t.textElem.focus(); });
     })
-    prez.addSlide(xtable(t, frame(o).bg.strokeWidth(2).end.padding(10)).xmargin(10));
+    addToPrez(xtable(t, frame(o).bg.strokeWidth(2).end.padding(10)).xmargin(10));
   })();
 
-  // http://grafico.kilianvalkhof.com/documentation/index.html#basics
-  // Weaknesses: no legend, x-axis is not flexible
-  addToPrez(ytable('A Line Graph using Grafico', rawAddHtml(600, 400, function(container) {
-    new Grafico.LineGraph(container,
-      { a: [20, 10, 6, 12, 7, 6, 9], b : [3, 5, 8] },
-      { markers: 'circle', datalabels: { a: 'Baseline', b: 'Improved'},
-        draw_hovers: true, font_size: 20, drawlegend: true,
-        colors: {a: 'blue', b: 'red'},
-      });
-  })));
-  addToPrez(ytable('A Bar Graph using Grafico', rawAddHtml(600, 400, function(container) {
-    new Grafico.BarGraph(container, [67.5, 74.3],
-      { labels: ['Baseline', 'Improved'],
-      });
-  })));
+  // LineGraph
+  addToPrez(lineGraph([[0, 5], [1, 9], [3, 4], [5, 6]], pause(), [5, 6, 9]).marker(Graph.circleMarker).trajectoryColors(['red', 'blue']));
 
   // Tutorial: http://www.recursion.org/d3-for-mere-mortals/
   // Using d3
@@ -137,7 +130,7 @@ function createSlides() {
   p.exit().remove();
 
   // Align
-  prez.addSlide(home(overlay(
+  addToPrez(home(overlay(
     circle(30), pause(),
     circle(50).onShow(function() { console.log('show circle'); }),
   _).onShow(function() { console.log('show overlay'); })));
@@ -146,8 +139,8 @@ function createSlides() {
   testCase(xtable(c1 = circle(30), pause(), circle(50).replace(c1)));
 
   // Animate (doesn't work properly in Chrome unless refreshed from this page)
-  prez.addSlide(square(30).color('blue'));
-  prez.addSlide(square(30).animate.scale(0.5).end);
+  addToPrez(square(30).color('blue'));
+  addToPrez(square(30).animate.scale(0.5).end);
 
   a = square(50).shift(10);
   b = square(50).shift(80, 30);
@@ -164,7 +157,7 @@ function createSlides() {
       container.resetContent(square(200));
       prez.refresh();
     });
-    prez.addSlide(home(overlay(container, button).center()));
+    addToPrez(home(overlay(container, button).center()));
   })();
 
   (function() {
@@ -174,7 +167,7 @@ function createSlides() {
       container.invalidateRender();
       prez.refresh();
     });
-    prez.addSlide(xtable(container, button));
+    addToPrez(xtable(container, button));
   })();
 
   // Text
@@ -247,9 +240,4 @@ function createSlides() {
 
 createSlides();
 
-function onLoad() {
-  /*var div = sfig_.newElem('div');
-  div.innerHTML = '<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" version="1.1"><text x="30" y="30">hello</text></svg>';
-  document.getElementsByTagName('body')[0].appendChild(div);*/
-  prez.run();
-}
+function onLoad() { prez.run(); }

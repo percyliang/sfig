@@ -3,18 +3,37 @@ sfig
 
 SVG/Javascript-based library for creating presentations/figures.
 
+To get an overview of the functionality, point your web browser to:
+
+    http://cs.stanford.edu/~pliang/sfig/examples/tutorial.html
+
 sfig works by itself, but you can readily incorporate third-party libraries.
 For example, sfig uses MathJax to render math.  You can download some of these
 packages:
 
     ./download-packages
 
-To get an overview of the functionality, point your web browser to:
-
-    examples/tutorial.html
-
-If you want to create a presentation, start with:
+If you want to create a presentation, start with the following as a template:
 
     examples/simple-presentation.html
 
 In any sfig presentation, you can press '?' for help.
+
+Currently, sfig has been tested with Chrome 21 and Firefox 15 on Linux and both
+work, although the math and animations work much better in Firefox due to a bug
+in Chrome.
+
+------------------------------------------------------------
+(C) Copyright 2012, Percy Liang
+
+http://cs.stanford.edu/~pliang
+
+Permission is granted for anyone to copy, use, or modify these programs and
+accompanying documents for purposes of research or education, provided this
+copyright notice is retained, and note is made of any changes that have been
+made.
+
+These programs and documents are distributed without any warranty, express or
+implied.  As the programs were written for research purposes only, they have
+not been tested to the degree that would be advisable in any important
+application.  All use of these programs is entirely at the user's own risk.

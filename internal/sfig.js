@@ -1,3 +1,6 @@
+// sfig: SVG/Javascript-based library for creating presentation/figures.
+// Percy Liang
+
 var sfig = {}; // Namespace of public members.
 var sfig_ = {}; // Namespace of private members.
 
@@ -80,14 +83,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig.pause = function(n) {
     if (n == null) n = 1;
-    return new sfig.PropertyChanger('pause('+n+')', function(properties) {
-      properties.showLevel = properties.showLevel.add(n);
+    return new sfig.PropertyChanger('pause('+n+')', function(env) {
+      env.showLevel = env.showLevel.add(n);
     });
   }
 
   sfig.level = function(n) {
-    return new sfig.PropertyChanger('level('+n+')', function(properties) {
-      properties.showLevel = n;
+    return new sfig.PropertyChanger('level('+n+')', function(env) {
+      env.showLevel = n;
     });
   }
 
@@ -126,29 +129,36 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.newElem = function(type) { return document.createElement(type); }
   sfig_.svgns = 'http://www.w3.org/2000/svg';
   sfig_.newSvgElem = function(type) { return document.createElementNS(sfig_.svgns, type); }
-
-  sfig_.rectToString = function(r) { return r.x+','+r.y+';'+r.width+'x'+r.height; }
-
-  sfig_.unionRect = function(svg, r1, r2) {
-    if (r1 == null) return r2;
-    if (r2 == null) return r1;
-    var r = svg.createSVGRect();
-    r.x = Math.min(r1.x, r2.x);
-    r.y = Math.min(r1.y, r2.y);
-    r.width = Math.max(r1.x + r1.width, r2.x + r2.width) - r.x;
-    r.height = Math.max(r1.y + r1.height, r2.y + r2.height) - r.y;
-    if (r.width < 0) throw r.width;
-    return r;
+  sfig_.newSvg = function() {
+    return sfig_.newSvgElem('svg', {
+      id: 'svg',
+      xmlns: sfig_.svgns,
+      version: '1.1',
+    });
   }
 
-  sfig_.cloneRect = function(svg, r1) {
-    if (r1 == null) return null;
-    var r = svg.createSVGRect();
-    r.x = r1.x;
-    r.y = r1.y;
-    r.width = r1.width;
-    r.height = r1.height;
-    return r;
+  sfig_.rectToString = function(r) { return r.x+','+r.y+';'+r.width+'x'+r.height; }
+  sfig_.svg = sfig_.newSvg();
+
+  sfig_.shiftMatrix = function(xshift, yshift) {
+    var ctm = sfig_.svg.createSVGMatrix();
+    ctm.e = xshift;
+    ctm.f = yshift;
+    return ctm;
+  }
+
+  sfig_.scaleMatrix = function(xscale, yscale) {
+    var ctm = sfig_.svg.createSVGMatrix();
+    ctm.a = xscale;
+    ctm.d = yscale;
+    return ctm;
+  }
+
+  sfig_.translateElem = function(elem, x, y) {
+    var transformed = sfig_.newSvgElem('g');
+    transformed.setAttribute('transform', 'translate('+x+','+y+')');
+    transformed.appendChild(elem);
+    return transformed;
   }
 
   var codeToKey = {
@@ -179,12 +189,24 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     return key;
   }
 
-  sfig_.pushInto = function(list, i, v) {
-    if (!list[i]) list[i] = [];
-    list[i].push(v);
+  // Creates subarrays dynamically as necessary.
+
+  // Append |value| to the list vector[i].
+  sfig_.vectorPushInto = function(vector, i, value) {
+    if (!vector[i]) vector[i] = [];
+    vector[i].push(value);
   }
 
-  sfig_.setValue = function(matrix, r, c, value) {
+  // Append |value| to the list matrix[r][c].
+  sfig_.matrixPushInto = function(matrix, r, c, value) {
+    var row = matrix[r];
+    if (row == null) row = matrix[r] = [];
+    if (!row[c]) row[c] = [];
+    row[c].push(value);
+  }
+
+  // Set matrix[r][c] to |value|.
+  sfig_.matrixSetValue = function(matrix, r, c, value) {
     var row = matrix[r];
     if (row == null) row = matrix[r] = [];
     row[c] = value;
@@ -218,6 +240,11 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (parentClass != Object) {
       childClass.prototype = new parentClass();
       childClass.prototype.constructor = parentClass;
+
+      // Copy defaults
+      childClass.defaults = new sfig.Properties();
+      if (parentClass.defaults != null)
+        childClass.defaults.from(parentClass.defaults);
     }
     childClass.prototype.className = className;
     childClass.prototype.myClass = childClass;
@@ -297,8 +324,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (this.value == null && this.func != null) {
       this.value = this.func.apply(null, this.args.map(function(arg) { return arg.get(); }));
       if (this.value instanceof sfig.Thunk) throw 'Value is thunk: '+this.value;
+      if (this.hookFunc != null) this.hookFunc(this.name, this.value);
     }
-    if (this.hookFunc != null) this.hookFunc(this.name, this.value);
     return this.value;
   }
 
@@ -306,7 +333,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   Thunk.prototype.set = function(newValue) {
     this.invalidate();
 
-    // If function, don't depend on arguments anymore.
+    // If function, remove dependendence on arguments anymore.
     if (this.func != null) {
       var self = this;
       this.args.forEach(function(arg) {
@@ -318,6 +345,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // Set new value
     if (newValue instanceof sfig.Thunk) {
+      // Depend on newValue *by reference*
       this.func = sfig.identity;
       this.args = [newValue];
       newValue.usedBy.push(this);
@@ -331,7 +359,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   }
 
   Thunk.prototype.invalidate = function() {
-    if (this.value == null) return;
+    if (this.value == null) return;  // Already invalidated
     this.value = null;
     this.usedBy.forEach(function(client) { client.invalidate(); });
   }
@@ -344,7 +372,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Thunk.prototype.getOrDie = function() {
     var value = this.get();
-    if (value == null) throw 'Null value from '+this;
+    if (value == null) throw 'Null value from '+this+' (maybe not available if Block isn\'t rendered yet)';
     return value;
   }
 
@@ -425,11 +453,12 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.properties = {};
     if (this.myClass.defaults != null) this.from(this.myClass.defaults);
   }
+  sfig_.inheritsFrom('Properties', Properties, Object);
 
   // Copy properties of |source| to |this|.
   Properties.prototype.from = function(source) {
     for (var name in source.properties)
-      this.setProperty(name, source.getProperty(name));
+      this.setProperty(name, source.getProperty(name).getOrDie());
     return this;
   }
 
@@ -466,7 +495,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   // Add property with given name to the given class |constructor|.
   sfig_.addProperty = function(constructor, name, defaultValue, description) {
     if (arguments.length != 4) throw 'Wrong number of arguments: '+Array.prototype.slice.call(arguments);
-    if (constructor.defaults == null) constructor.defaults = new sfig.Properties();
     if (defaultValue != null) constructor.defaults.setProperty(name, defaultValue);
 
     if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
@@ -479,7 +507,26 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
     }
   }
-  sfig_.inheritsFrom('Properties', Properties, Object);
+
+  // Add property with given name to the given class |constructor|.
+  sfig_.addMapProperty = function(constructor, name, defaultValue, description) {
+    if (arguments.length != 4) throw 'Wrong number of arguments: '+Array.prototype.slice.call(arguments);
+    if (defaultValue != null) constructor.defaults.setProperty(name, defaultValue);
+
+    if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
+    constructor.prototype[name] = function(key, newValue) {
+      if (arguments.length == 0) {
+        return this.getProperty(name);
+      } else if (arguments.length == 2) {
+        var map = this.getProperty(name).get();
+        if (map == null) map = {};
+        map[key] = newValue;
+        return this.setProperty(name, map);
+      } else {
+        throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
+      }
+    }
+  }
 
   // Add property with given names to the given class |constructor|.
   // |name| is a pair property (e.g., shift) which modifies the same variables as |name1| and |name2|.
@@ -489,7 +536,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (constructor.prototype[name1]) throw constructor.prototype.className+' already has property '+name1;
     if (constructor.prototype[name2]) throw constructor.prototype.className+' already has property '+name2;
 
-    if (constructor.defaults == null) constructor.defaults = new sfig.Properties();
     if (defaultValue1 != null) constructor.defaults.setProperty(name1, defaultValue1);
     if (defaultValue2 != null) constructor.defaults.setProperty(name2, defaultValue2);
 
@@ -549,30 +595,57 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   }
   sfig_.inheritsFrom('Animate', Animate, sfig.Properties);
 
-  // The Block is the central object.  It is essentially a tree of function calls,
-  // which ultimately is rendered to produce SVG dom elements.
+  // The Block is basic unit which we use to specify what is displayed.
+  // One view is that it is essentially a tree of function calls,
+  // which ultimately is rendered to produce SVG DOM elements.
+  // A Block is in one of two stages:
+  //   1) Construction and setting of properties.
+  //   2) Rendering: sets initDependencies/children, elem/rendering properties, state (if root)
   var Block = sfig.Block = function() {
     Block.prototype.constructor.call(this);
-
-    // List of initial dependencies - these should be rendered first before children.
-    this.initDependencies = [];
-
-    // List of sub-Blocks
-    this.children = [];
-
-    // When this object is rendered, set to the corresponding DOM element
-    // (e.g., SVG <g></g>).
-    this.elem = null;
-    this.hasAnimation = null;  // Whether there are any animations
 
     this.animate = new sfig.Animate();
     this.animate.setEnd(this);
 
+    this.resetRender();
+  };
+  sfig_.inheritsFrom('Block', Block, sfig.Properties);
+
+  Block.prototype.getRoot = function() {
+    var block = this;
+    while (block.parent != null) block = block.parent;
+    return block;
+  }
+
+  // Go back to stage one (remove all rendering information).
+  // TODO: quite possible that there's a memory leak with Thunks.
+  Block.prototype.resetRender = function() {
+    // Recurse.
+    if (this.children != null)
+      for (var i = 0; i < this.children.length; i++) this.children[i].resetRender();
+
+    this.initDependencies = null;  // List of initial dependencies - these should be rendered first before children.
+    this.children = null;  // List of sub-Blocks.
+    this.parent = null;
+
     // Environment - properties might change for children via PropertyChangers
     this.env = {};
     this.env.showLevel = this.showLevel();
-  };
-  sfig_.inheritsFrom('Block', Block, sfig.Properties);
+
+    // When this object is rendered, set to the corresponding DOM element
+    // (e.g., SVG <g></g>).
+    this.getBlocksVisited = null;
+    this.elem = null;
+    this.hasAnimation = null;  // Whether there are any animations
+    this.bboxIsSet = null;
+
+    // Only applicable for the top node
+    if (this.state) {
+      this.state.animateBlocks = [];
+      this.state.showBlocks = [];
+      this.state.hideBlocks = [];
+    }
+  }
 
   Block.prototype.ensureRendered = function() {
     if (this.elem == null) throw 'Not rendered yet: ' + this.toString(true);
@@ -588,18 +661,31 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Block.prototype.addChild = function(item) {
     if (item instanceof sfig.Block) {
+      item.freeze();  // When child is added, its properties are frozen
+      if (this.children == null) throw 'Children not initialized yet for '+item;
       this.children.push(item);
       if (item.parent != null) throw 'Already has parent, trying to give another: '+item;
       item.parent = this;
-      // env -> item [if not exists]
-      if (!item.showLevel().exists()) item.showLevel(this.env.showLevel);
-      // item.env -> env
-      this.env.showLevel = item.env.showLevel;
+      if (!item.showLevel().exists()) {  // Only propagate to/from item if its level is specified
+        // env -> item [if not exists]
+        item.showLevel(this.env.showLevel);
+        // item.env -> env
+        this.env.showLevel = item.env.showLevel;
+      }
     } else if (item instanceof sfig.PropertyChanger) {
       item.operation(this.env);
     } else {
       throw 'Invalid: '+item;
     }
+  }
+
+  // Take some of the salient properties from |source|.
+  // Use case: |this| is an edge connected to the |source| node.
+  Block.prototype.mimic = function(source) {
+    this.showLevel(source.showLevel());
+    this.hideLevel(source.hideLevel());
+    this.orphan(source.orphan());
+    return this;
   }
 
   sfig_.addProperty(Animate, 'duration', '1s', 'Time to spend performing the animation');
@@ -643,19 +729,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addProperty(Block, 'onMouseout', null, 'Function to call when mouse moves out of object.');
   sfig_.addProperty(Block, 'onShow', null, 'Function to call when object is shown.');
 
-  Block.prototype.partOnClick = function(id, value) {
-    if (!this.partOnClickMap) this.partOnClickMap = {};
-    this.partOnClickMap[id] = value;
-    return this;
-  }
+  sfig_.addMapProperty(Block, 'partOnClick', null, 'Function to call when part of the object is clicked.');
+  sfig_.addMapProperty(Block, 'partTooltip', null, 'String to display when mouse goes over.');
 
-  Block.prototype.partTooltip = function(id, value) {
-    if (!this.partTooltipMap) this.partTooltipMap = {};
-    this.partTooltipMap[id] = value;
-    return this;
-  }
-
-  // Derived properties
+  // Rendered properties.
   // The bounding box of this object as perceived by the outside world
   // for purposes of layout (doesn't actually have to be the real bounding
   // box).
@@ -665,8 +742,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addDerivedProperty(Block, 'bottom', function(a, b) { return a + b; }, ['top', 'realHeight'], 'Bottom coordinate');
   sfig_.addDerivedProperty(Block, 'xmiddle', function(a, b) { return a + b/2; }, ['left', 'realWidth'], 'Middle x-coordinate');
   sfig_.addDerivedProperty(Block, 'ymiddle', function(a, b) { return a + b/2; }, ['top', 'realHeight'], 'Middle y-coordinate');
-
-  //sfig_.addProperty(Block, 'round', 'Whether this object is to be treated as an ellipse');
 
   // Return the point of where a ray from the center leaving with given angle would intersect
   // the boundaries.  By default, assume rectangular boundaries.
@@ -704,6 +779,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Block.prototype.elemString = function() { return new XMLSerializer().serializeToString(this.elem); }
 
+  // TODO: optimize (don't recurse if nothing to set)
   Block.prototype.setStrokeFillProperties = function(elem, direct) {
     if (elem.tagName == 'g') {
       // Recursively set properties
@@ -754,6 +830,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (b == null) return a;
     return Math.min(a, b);
   }
+
   function robustMax(a, b) {
     if (a == null) return b;
     if (b == null) return a;
@@ -762,15 +839,17 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   // Set this.elem to the rendered element and update all the bounding boxes recursively.
   Block.prototype.applyTransforms = function(state) {
+    // Perform transforms (remember to update the bounding boxes recursively).
     var transforms = [];
+    var ctm = sfig_.svg.createSVGMatrix();
+
     // Note: translate must come before scale to not affect the amount
     // translated.
-    var ctm = state.svg.createSVGMatrix();
-
     var xshift = this.xshift().getOrElse(0);
     var yshift = this.yshift().getOrElse(0);
     if (xshift != 0 || yshift != 0) {
       transforms.push('translate('+xshift+','+yshift+')');
+      //ctm = sfig_.shiftMatrix(xshift, yshift);
       ctm.e = xshift;
       ctm.f = yshift;
     }
@@ -779,6 +858,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var yscale = this.yscale().getOrElse(1);
     if (xscale != 1 || yscale != 1) {
       transforms.push('scale('+xscale+','+yscale+')');
+      //ctm = sfig_.scaleMatrix(xscale, yscale);
       ctm.a = xscale;
       ctm.d = yscale;
     }
@@ -786,18 +866,18 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var rotate = this.rotate().getOrElse(0);
     if (rotate != 0) {
       transforms.push('rotate('+rotate+','+this.xrotatePivot().getOrElse(0)+','+this.yrotatePivot().getOrElse(0)+')');
-      ctm = null;  // Don't know how to handle this right now, give up
+      ctm = null;
     }
 
     var xskew = this.xskew().getOrElse(0);
     if (xskew != 0) {
       transforms.push('skewX('+xskew+')');
-      ctm = null;  // Don't know how to handle this right now, give up
+      ctm = null;
     }
     var yskew = this.yskew().getOrElse(0);
     if (yskew != 0) {
       transforms.push('skewY('+yskew+')');
-      ctm = null;  // Don't know how to handle this right now, give up
+      ctm = null;
     }
 
     if (transforms.length > 0)
@@ -805,72 +885,79 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     state.svg.appendChild(this.elem);  // Need elements to be added before we can bounding box.
 
-    // Compute from scratch
+    // Compute bounding box if it doesn't already exist
+    if (!this.bboxIsSet) {
+      this.bboxIsSet = true;
+      if (this.children.length == 0) {  // Base case
+        var bbox = this.elem.getBBox();
+        // By default, the bounding box does not include half of the stroke.
+        // Adjust it so it includes the entire element.
+        var s = getStrokeWidth(this.elem);
+        this.left(bbox.x - s/2);
+        this.top(bbox.y - s/2);
+        this.realWidth(bbox.width + s);
+        this.realHeight(bbox.height + s);
+      } else {  // Recursive case
+        var x0, y0, x1, y1;
+        this.children.forEach(function(child) {
+          if (child.elem == null) throw 'Child not rendered: '+child;
+          if (!child.orphan().get()) {
+            x0 = robustMin(x0, child.left().get());
+            y0 = robustMin(y0, child.top().get());
+            x1 = robustMax(x1, child.right().get());
+            y1 = robustMax(y1, child.bottom().get());
+          }
+        });
+        if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
+        //sfig.L('update', this, x0, this.left().get());
+      }
+    }
+
+    // Compute transformation from scratch
     if (ctm == null) {
       ctm = this.elem.getTransformToElement(state.svg);
-      //L('compute transform from scratch', transforms.join(' '), S(ctm));
+      //sfig.L('compute transform from scratch', transforms.join(' '), S(ctm));
     }
 
-    if (this.children.length == 0) {  // Base case
-      var bbox = this.elem.getBBox();
-      // By default, the bounding box does not include half of the stroke.
-      // Adjust it so it includes the entire element.
-      var s = getStrokeWidth(this.elem);
-      this.left(bbox.x - s/2);
-      this.top(bbox.y - s/2);
-      this.realWidth(bbox.width + s);
-      this.realHeight(bbox.height + s);
-    } else {  // Recursive case
-      var x0, y0, x1, y1;
-      this.children.forEach(function(child) {
-        if (child.elem == null) throw 'Child not rendered: '+child;
-        if (!child.orphan().get()) {
-          x0 = robustMin(x0, child.left().get());
-          y0 = robustMin(y0, child.top().get());
-          x1 = robustMax(x1, child.right().get());
-          y1 = robustMax(y1, child.bottom().get());
-        }
-      });
-      if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
-    }
+    // Propagate the transformation down to the bounding boxes
+    if (transforms.length > 0) this.updateBBox(ctm);
 
-    if (transforms.length > 0) {
-      function recursivelyTransform(block) {
-        block.updateBBox(state, ctm);
-        block.children.forEach(recursivelyTransform);
-      }
-      recursivelyTransform(this);
-    }
+    //sfig.L(this.toString(), this.left().get(), this.realWidth().get(), this.xmiddle().get());
   }
 
-  Block.prototype.updateBBox = function(state, ctm) {
+  Block.prototype.updateBBox = function(ctm) {
     var x = this.left().get(), y = this.top().get(), width = this.realWidth().get(), height = this.realHeight().get();
 
     // Optimization: only have translate and scale, can solve simpler
     if (ctm.b == 0 && ctm.c == 0) {
+      //sfig.L('updateBBox', this, this.left().get(), x * ctm.a + ctm.e);
       this.left(x * ctm.a + ctm.e);
       this.top(y * ctm.d + ctm.f);
       this.realWidth(width * ctm.a);
       this.realHeight(height * ctm.d);
-      return;
+    } else {
+      // Because of rotations, need to compute where all the four corners go.
+      var x0, y0, x1, y1;
+      var p = sfig_.svg.createSVGPoint();
+      [[0,0], [1,0], [0, 1], [1,1]].forEach(function(s) {
+        p.x = x + width * s[0];
+        p.y = y + height * s[1];
+        p = p.matrixTransform(ctm);
+        x0 = robustMin(x0, p.x);
+        y0 = robustMin(y0, p.y);
+        x1 = robustMax(x1, p.x);
+        y1 = robustMax(y1, p.y);
+      });
+
+      if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
     }
 
-    var x0, y0, x1, y1;
-    var p = state.svg.createSVGPoint();
-    [[0,0], [1,0], [0, 1], [1,1]].forEach(function(s) {
-      p.x = x + width * s[0];
-      p.y = y + height * s[1];
-      p = p.matrixTransform(ctm);
-      x0 = robustMin(x0, p.x);
-      y0 = robustMin(y0, p.y);
-      x1 = robustMax(x1, p.x);
-      y1 = robustMax(y1, p.y);
-    });
-
-    if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
+    // Recurse
+    for (var i = 0; i < this.children.length; i++)
+      this.children[i].updateBBox(ctm);
   }
 
-  // reverse: whether we're going backwards in time
+  // reverse: whether we're going through the slides backwards in time (false by default)
   Block.prototype.show = function(reverse) {
     this.elem.style.display = null;
     if (!reverse && this.replace().get() != null) this.replace().get().hide(reverse);
@@ -881,8 +968,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (reverse && this.replace().get() != null) this.replace().get().show(reverse);
   }
 
-  // TODO: doesn't work in Firefox
   Block.prototype.startAnimate = function() {
+    // TODO: Animating Text (which is a foreignObject) in Firefox doesn't work (but works in Chrome)
     if (sfig.enableAnimations) {
       for (var i = 0; i < this.elem.childElementCount; i++) {
         var animate = this.elem.childNodes[i];
@@ -956,6 +1043,11 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
   }
 
+  // Create the children and set any remaining properties based on others.
+  // Default: do nothing.
+  Block.prototype.createChildren = function() { }
+
+  // Look at all the properties and children and create the SVG elem property.
   // Default: just collect children into a single group.
   Block.prototype.renderElem = function(state, callback) {
     var group = sfig_.newSvgElem('g');
@@ -965,68 +1057,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     });
     this.elem = group;
     callback();
-  }
-
-  Block.prototype.invalidateRender = function() {
-    // Go up to the root
-    var block = this;
-    while (block.parent != null) block = block.parent;
-
-    // Delete everything
-    function recurse(block) {
-      block.getBlocksVisited = null;
-      block.elem = null;
-      block.hasAnimation = null;
-      block.children.forEach(recurse);
-    }
-    recurse(block);
-
-    block.state.animateBlocks = [];
-    block.state.showBlocks = [];
-    block.state.hideBlocks = [];
-  }
-
-  Block.prototype.render = function(state, callback) {
-    // Recursively go through children and get all blocks in the order they should be rendered.
-    function recursiveGetBlocks(block, blocks) {
-      if (block.getBlocksVisited) return;
-      block.getBlocksVisited = true;
-      for (var i = 0; i < block.initDependencies.length; i++)
-        recursiveGetBlocks(block.initDependencies[i], blocks);
-      for (var i = 0; i < block.children.length; i++)
-        recursiveGetBlocks(block.children[i], blocks);
-      blocks.push(block);
-    }
-
-    // Figure out which descendents need to be rendered
-    var blocks = [];
-    recursiveGetBlocks(this, blocks);
-    //sfig.L(blocks.length);
-
-    // Now go through all the Blocks and render them.
-    var i = 0;
-    var stage = 0;
-    function process() {
-      // Optimization: don't need recursion/callback mechanism for blocks that don't need it
-      while (i < blocks.length && !blocks[i].renderUsesCallback) {
-        blocks[i].renderElem(state, sfig.identity);
-        blocks[i].postRender(state);
-        i++;
-      }
-
-      if (i == blocks.length) return callback();
-      var block = blocks[i];
-      if (stage == 0) {  // First render...
-        stage = 1;
-        block.renderElem(state, process);
-      } else {  // Then post-process the rendered element
-        block.postRender(state);
-        i++;
-        stage = 0;
-        process();
-      }
-    }
-    process();
   }
 
   Block.prototype.postRender = function(state) {
@@ -1052,31 +1082,84 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (this.onMouseover().get() != null) this.elem.onmouseover = sfig_.funcPrependArg(this.onMouseover().get(), this);
     if (this.onMouseout().get() != null) this.elem.onmouseout = sfig_.funcPrependArg(this.onMouseout().get(), this);
 
-    if (this.partTooltipMap) {
-      for (var id in this.partTooltipMap) {
-        var partElem = document.getElementById(id);
+    var partTooltip = this.partTooltip().get();
+    if (partTooltip != null) {
+      for (var key in partTooltip) {
+        var partElem = document.getElementById(key);
         var title = sfig_.newElem('title');
-        title.innerHTML = this.partTooltipMap[id];
+        title.innerHTML = partTooltip[key];
         partElem.appendChild(title);
       }
     }
-    if (this.partOnClickMap) {
-      for (var id in this.partOnClickMap) {
-        var partElem = document.getElementById(id);
+    var partOnClick = this.partOnClick().get();
+    if (partOnClick) {
+      for (var key in partOnClick) {
+        var partElem = document.getElementById(key);
         var self = this;
         //partElem.style.pointerEvents = 'all';
-        partElem.onclick = function() { self.partOnClickMap[id](self, partElem); };
+        partElem.onclick = function() { partOnClick[key](self, partElem); };
       }
     }
 
     this.addAnimations(this.elem);
 
-    // Keep pointer to this element
+    // Index level to this element so we can quickly show/hide as we change levels.
     var showLevel = this.showLevel().get();
     var hideLevel = this.hideLevel().get();
-    if (this.hasAnimation) sfig_.pushInto(state.animateBlocks, showLevel, this);
-    if (showLevel != -1) sfig_.pushInto(state.showBlocks, showLevel, this);
-    if (hideLevel != -1) sfig_.pushInto(state.hideBlocks, hideLevel, this);
+    if (this.hasAnimation) sfig_.vectorPushInto(state.animateBlocks, showLevel, this);
+    if (showLevel != -1) sfig_.vectorPushInto(state.showBlocks, showLevel, this);
+    if (hideLevel != -1) sfig_.vectorPushInto(state.hideBlocks, hideLevel, this);
+  }
+
+  // Called (either manually or automatically) when we're done setting properties.
+  Block.prototype.freeze = function() {
+    // Create children if they don't exist.
+    if (this.children == null) {
+      this.initDependencies = [];
+      this.children = [];
+      this.createChildren();
+    }
+    return this;
+  }
+
+  Block.prototype.render = function(state, callback) {
+    // Recursively go through children and get all blocks in the order they should be rendered.
+    function recursiveGetBlocks(block, blocks) {
+      if (block.getBlocksVisited) return;
+      block.getBlocksVisited = true;
+      for (var i = 0; i < block.initDependencies.length; i++)
+        recursiveGetBlocks(block.initDependencies[i], blocks);
+      for (var i = 0; i < block.children.length; i++)
+        recursiveGetBlocks(block.children[i], blocks);
+      blocks.push(block);
+    }
+    var blocks = [];
+    recursiveGetBlocks(this, blocks);
+
+    // Finally, go through all the Blocks and render them.
+    var i = 0;
+    var stage = 0;
+    function process() {
+      // Optimization: don't need recursion/callback mechanism for blocks that don't need it
+      while (i < blocks.length && !blocks[i].renderUsesCallback) {
+        blocks[i].renderElem(state, sfig.identity);
+        blocks[i].postRender(state);
+        i++;
+      }
+
+      if (i == blocks.length) return callback();
+      var block = blocks[i];
+      if (stage == 0) {  // First render...
+        stage = 1;
+        block.renderElem(state, process);
+      } else {  // Then post-process the rendered element
+        block.postRender(state);
+        i++;
+        stage = 0;
+        process();
+      }
+    }
+    process();
   }
 
   Block.prototype.toString = function(recurse) {
@@ -1085,7 +1168,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       var value = this.properties[name];
       if (value.value != null) str += ',' + name + '=' + value.value;
     }
-    if (recurse && this.children.length != 0) {
+    if (recurse && this.children && this.children.length != 0) {
       str += '['+this.children.map(function(block) { return block.toString(recurse); }).join(' ')+']';
     }
     return str;
@@ -1124,6 +1207,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 })();
 
 ////////////////////////////////////////////////////////////
+// Subclasses of Block.
+////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////
 // Text
 
 (function() {
@@ -1132,6 +1219,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   };
   sfig_.inheritsFrom('Text', Text, sfig.Block);
 
+  // TODO: disadvantage with building bulleted lists this way is that it must
+  // be text all rendered at once (can't put pause()).
   function bulletize(content) {
     if (typeof(content) == 'string') return content;
     var result = (content[0] ? content[0] : '') + '<ul style="margin:0">';
@@ -1141,6 +1230,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     return result;
   }
 
+  // Due to MathJax, renderElem doesn't callback.
   Text.prototype.renderUsesCallback = true;
 
   Text.prototype.renderElem = function(state, callback) {
@@ -1198,7 +1288,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 })();
 
 ////////////////////////////////////////////////////////////
-// TextBox: allow user to enter text
+// TextBox: allow user to enter text.
 
 (function() {
   // Select doesn't work in Chrome:
@@ -1428,14 +1518,17 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 (function() {
   var ArrowHead = sfig.ArrowHead = function() {
     ArrowHead.prototype.constructor.call(this);
+  };
+  sfig_.inheritsFrom('ArrowHead', ArrowHead, sfig.Block);
+
+  ArrowHead.prototype.createChildren = function() {
     var width = this.width().getOrElse(sfig.defaultArrowWidth);
     var length = this.length().getOrElse(sfig.defaultArrowLength);
     var poly = sfig.polygon([0,0], [-length, -width/2], [-length, +width/2]);
     poly.rotate(this.angle());
     poly.shift(this.xtip(), this.ytip());
     this.addChild(poly);
-  };
-  sfig_.inheritsFrom('ArrowHead', ArrowHead, sfig.Block);
+  }
 
   // Set by the Line
   sfig_.addPairProperty(ArrowHead, 'tip', 'xtip', 'ytip', null, null, 'Tip of the arrow');
@@ -1496,6 +1589,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     elem.setAttribute('y2', y2);
 
     // TODO: set angles
+    // TODO: curved lines
 
     // Save our rendered values
     this.realAngle1(angle1);
@@ -1543,29 +1637,34 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 // DecoratedLine: decorate Line with arrow heads and labels.
 
 (function() {
-  var DecoratedLine = sfig.DecoratedLine = function(drawArrow1, drawArrow2) {
+  var DecoratedLine = sfig.DecoratedLine = function() {
     DecoratedLine.prototype.constructor.call(this);
     this.line = new sfig.Line();
     this.line.setEnd(this);
+  };
+  sfig_.inheritsFrom('DecoratedLine', DecoratedLine, sfig.Block);
+
+  DecoratedLine.prototype.createChildren = function() {
     this.addChild(this.line);
-    if (drawArrow1) {
+    if (this.drawArrow1().get()) {
       this.arrowHead1 = new sfig.ArrowHead();
       this.arrowHead1.setEnd(this);
       this.addChild(this.arrowHead1);
       this.arrowHead1.tip(this.line.realx1(), this.line.realy1()).angle(this.line.realAngle1().add(180)).color(this.line.strokeColor().orElse(sfig.defaultStrokeColor));
     }
-    if (drawArrow2) {
+    if (this.drawArrow2().get()) {
       this.arrowHead2 = new sfig.ArrowHead();
       this.arrowHead2.setEnd(this);
       this.addChild(this.arrowHead2);
       this.arrowHead2.tip(this.line.realx2(), this.line.realy2()).angle(this.line.realAngle2()).color(this.line.strokeColor().orElse(sfig.defaultStrokeColor));
     }
   };
-  sfig_.inheritsFrom('DecoratedLine', DecoratedLine, sfig.Block);
 
-  sfig.decoratedLine = function(arg1, arg2, drawArrow1, drawArrow2) { return new DecoratedLine(drawArrow1, drawArrow2).line.arg1(arg1).arg2(arg2).end; }
-  sfig.arrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2, false, true); }
-  sfig.doubleArrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2, true, true); }
+  sfig_.addPairProperty(DecoratedLine, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Whether to draw an arrow at the two ends of the line');
+
+  sfig.decoratedLine = function(arg1, arg2) { return new DecoratedLine().line.arg1(arg1).arg2(arg2).end; }
+  sfig.arrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2).drawArrow(false, true); }
+  sfig.doubleArrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2).drawArrow(true, true); }
 
   sfig.leftArrow = function(n) { return sfig.arrow([0, 0], [-n, 0]); }
   sfig.rightArrow = function(n) { return sfig.arrow([0, 0], [n, 0]); }
@@ -1635,15 +1734,18 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   var Wrap = sfig.Wrap = function(content) {
     Wrap.prototype.constructor.call(this);
     this.content = sfig.std(content);
-    this.addChild(this.content);
   };
   sfig_.inheritsFrom('Wrap', Wrap, sfig.Block);
 
+  Wrap.prototype.createChildren = function() {
+    this.addChild(this.content);
+  }
+
   Wrap.prototype.resetContent = function(content) {
     this.content = sfig.std(content);
-    this.children.splice(0);
-    this.addChild(this.content);
-    this.invalidateRender();
+    var root = this.getRoot();
+    root.resetRender();
+    root.freeze();
   }
 
   sfig.wrap = function(block) { return new sfig.Wrap(block); }
@@ -1662,17 +1764,26 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   var Transform = sfig.Transform = function(content) {
     Transform.prototype.constructor.call(this);
     this.content = sfig.std(content);
+  };
+  sfig_.inheritsFrom('Transform', Transform, sfig.Block);
 
+  Transform.prototype.createChildren = function() {
     var wrapped = sfig.wrap(this.content);
 
     // Shift so that the pivot point is at (0,0)
-    var x1 = this.content.left().mul(sfig.tconstant(1).sub(this.xpivot()));
-    var x2 = this.content.right().mul(sfig.tconstant(1).add(this.xpivot()));
-    wrapped.xshift(x1.add(x2).mul(-0.5));
+    var xpivot = this.xpivot().get();
+    if (xpivot != null) {
+      var x1 = this.content.left().mul(-0.5 * (1 - xpivot));
+      var x2 = this.content.right().mul(-0.5 * (1 + xpivot));
+      wrapped.xshift(x1.add(x2));
+    }
 
-    var y1 = this.content.top().mul(sfig.tconstant(1).sub(this.ypivot()));
-    var y2 = this.content.bottom().mul(sfig.tconstant(1).add(this.ypivot()));
-    wrapped.yshift(y1.add(y2).mul(-0.5));
+    var ypivot = this.ypivot().get();
+    if (ypivot != null) {
+      var y1 = this.content.top().mul(-0.5 * (1 - ypivot));
+      var y2 = this.content.bottom().mul(-0.5 * (1 + ypivot));
+      wrapped.yshift(y1.add(y2));
+    }
 
     // Resize so that width and height are as desired
     var xscale = this.width().andThen(this.width().div(this.content.realWidth()));
@@ -1681,11 +1792,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     wrapped.yscale(yscale.orElse(xscale));
 
     this.addChild(wrapped);
-  };
-  sfig_.inheritsFrom('Transform', Transform, sfig.Block);
+  }
 
-  Transform.prototype.center = function() { return this.pivot(0, 0); }
   Transform.prototype.home = function() { return this.pivot(-1, -1); }
+  Transform.prototype.center = function() { return this.pivot(0, 0); }
 
   // These are used to set shift, scale
   sfig_.addPairProperty(Transform, 'pivot', 'xpivot', 'ypivot', null, null, 'A relative scaling (between [-1,1]) determines position of each child.  Make each of these positions coincide at (0,0).');
@@ -1697,21 +1807,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 })();
 
 ////////////////////////////////////////////////////////////
-// Group: a group of objects rendered on top of each other.
-
-(function() {
-  var Group = sfig.Group = function(items) {
-    var self = this;
-    Group.prototype.constructor.call(this);
-    this.items = sfig.std(items);
-    this.items.forEach(function(item) { self.addChild(item); });
-  };
-  sfig_.inheritsFrom('Group', Group, sfig.Block);
-
-  sfig.group = function() { return new Group(arguments); }
-})();
-
-////////////////////////////////////////////////////////////
 // Overlay: a group of objects rendered on top of each other.
 
 (function() {
@@ -1719,16 +1814,21 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var self = this;
     Overlay.prototype.constructor.call(this);
     this.items = sfig.std(items);
-    this.items.forEach(function(item) {
-      if (item instanceof sfig.Block)
-        self.addChild(sfig.transform(item).pivot(self.xpivot(), self.ypivot()));
-      else if (item instanceof sfig.PropertyChanger)
-        self.addChild(item);
-      else
-        throw 'Invalid: '+item;
-    });
   };
   sfig_.inheritsFrom('Overlay', Overlay, sfig.Block);
+
+  Overlay.prototype.createChildren = function() {
+    var self = this;
+    this.items.forEach(function(item) {
+      if (item instanceof sfig.Block) {
+        self.addChild(sfig.transform(item).pivot(self.xpivot(), self.ypivot()));
+      } else if (item instanceof sfig.PropertyChanger) {
+        self.addChild(item);
+      } else {
+        throw 'Invalid: '+item;
+      }
+    });
+  }
 
   // Delegate pivoting to the transforms
   Overlay.prototype.center = function() { return this.pivot(0, 0); }
@@ -1746,18 +1846,28 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.content = sfig.std(content);
     this.bg = new sfig.Rect();
     this.bg.setEnd(this);
-    this.bg.strokeWidth(0);
-    // Make |bg| a bit bigger than |content| so that it fits snuggly without overlapping.
-    var extra = this.bg.strokeWidth().orElse(0).div(2);
-    this.bg.width(this.content.realWidth().add(this.xpadding().orElse(0).add(extra).mul(2)));
-    this.bg.height(this.content.realHeight().add(this.ypadding().orElse(0).add(extra).mul(2)));
 
-    var all = sfig.overlay(this.bg, this.content);
-    all.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
-    this.initDependencies = [this.content];
-    this.addChild(all);
+    this.overlay = sfig.overlay(this.bg, this.content);
+    this.overlay.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
   };
   sfig_.inheritsFrom('Frame', Frame, sfig.Block);
+
+  Frame.prototype.createChildren = function() {
+    var strokeWidth = this.bg.strokeWidth();
+    if (!strokeWidth.exists()) strokeWidth.set(0);
+
+    // Make |bg| a bit bigger than |content| so that it fits snuggly without overlapping.
+    var extra = strokeWidth.get() / 2;
+    var width = this.bg.width();
+    var height = this.bg.height();
+    if (!width.exists())
+      width.set(this.content.realWidth().add((this.xpadding().getOrElse(0) + extra) * 2));
+    if (!height.exists())
+      height.set(this.content.realHeight().add((this.ypadding().getOrElse(0) + extra) * 2));
+
+    this.addInitDependency(this.content);
+    this.addChild(this.overlay);
+  }
 
   // Delegate pivoting to the transforms
   Frame.prototype.center = function() { return this.pivot(0, 0); }
@@ -1769,106 +1879,97 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
 ////////////////////////////////////////////////////////////
 // Table
+// TODO: support multirow/column tables
 
 (function() {
-  // items: two-dimensional array with PropertyChangers
   var Table = sfig.Table = function(contents) {
-    var self = this;
     Table.prototype.constructor.call(this);
     contents = sfig.std(contents);
 
-    // For each row r, column c, content[r][c] is the Block at that position,
-    // and cells[r][c] is the transformed quantity.
-    this.contents = [];
-    this.cells = [];  // Container
+    this.items = []; // Flattened version of contents
+    this.cells = [];
 
     var r = 0;
     var c = 0;
     var numCols = -1;
-    contents.forEach(function(item) {
-      if (item instanceof Array){
-        item.forEach(function(x) {
+    for (var i = 0; i < contents.length; i++) {
+      var item = contents[i];
+      if (item instanceof Array) {
+        for (var j = 0; j < item.length; j++) {
+          var x = item[j];
           if (x instanceof sfig.Block) {
-            // Need to render the items before all the cells
-            self.addInitDependency(x);
-
-            // Put the cell in a frame to make it the right size
-            var cell = sfig.frame(x).orphan(x.orphan());
-            // Move the cell into the right position
-            cell = sfig.transform(cell).pivot(-1, -1);
-            self.addChild(cell);
-            sfig_.setValue(self.contents, r, c, x);
-            sfig_.setValue(self.cells, r, c, cell);
-
-            c++;
+            sfig_.matrixSetValue(this.cells, r, c++, x);
+            this.items.push(x);
           } else if (x instanceof sfig.PropertyChanger) {
-            self.addChild(x);
+            this.items.push(x);
           } else {
-            throw 'Expected Obj or StateChanger, but got: '+x;
+            throw 'Expected Block or PropertyChanger, but got: '+x;
           }
-        });
+        }
         if (numCols == -1) numCols = c;
         if (numCols != c) throw 'Each row must have the same number of columns, but row 0 has '+numCols+' while row '+(r+1)+' has '+c;
-        r++;
         c = 0;
+        r++;
       } else if (item instanceof sfig.PropertyChanger) {
-        self.addChild(item);
+        this.items.push(item);
       } else {
         throw 'Expected Array or PropertyChanger, but got: '+item;
       }
-    });
+    }
     this.numCols = numCols;
     this.numRows = r;
+  };
+  sfig_.inheritsFrom('Table', Table, sfig.Block);
 
-    // For each row r, column c, matrix[r][c] is the object at that position.
-    this.numRows = this.contents.length;
-    this.numCols = this.numRows > 0 ? this.contents[0].length : 0;
-    for (var r = 0; r < this.numRows; r++)
-      if (this.contents[r].length != this.numCols)
-        throw 'Row 0 has '+this.numCols+' columns, but row '+r+' has '+this.contents[r].length+' columns';
+  Table.prototype.createChildren = function() {
+    for (var i = 0; i < this.items.length; i++) this.addChild(this.items[i]);
+  }
 
-    var xjustify = [];
-    for (var c = 0; c < this.numCols; c++)
-      xjustify[c] = this.xjustify().charAtOrLast(c, 'l');
-
-    var yjustify = [];
-    for (var r = 0; r < this.numRows; r++)
-      yjustify[r] = this.yjustify().charAtOrLast(r, 'l');
+  Table.prototype.renderElem = function(state, callback) {
+    // Justification
+    var xjustify = this.xjustify().getOrElse('l');
+    while (xjustify.length < this.numCols) xjustify += xjustify[xjustify.length-1];
+    var yjustify = this.yjustify().getOrElse('l');
+    while (yjustify.length < this.numRows) yjustify += yjustify[yjustify.length-1];
 
     // Compute maximum width of each column and height of each column
     var widths = [];
     var heights = [];
-    for (var r = 0; r < this.numCols; r++) widths.push(this.cellWidth().orElse(0));
-    for (var c = 0; c < this.numRows; c++) heights.push(this.cellHeight().orElse(0));
+    var cellWidth = this.cellWidth().getOrElse(0);
+    var cellHeight = this.cellHeight().getOrElse(0);
+    for (var r = 0; r < this.numCols; r++) widths.push(cellWidth);
+    for (var c = 0; c < this.numRows; c++) heights.push(cellHeight);
     for (var r = 0; r < this.numRows; r++) {
       for (var c = 0; c < this.numCols; c++) {
-        widths[c] = widths[c].max(this.contents[r][c].realWidth());
-        heights[r] = heights[r].max(this.contents[r][c].realHeight());
+        widths[c] = Math.max(widths[c], this.cells[r][c].realWidth().get());
+        heights[r] = Math.max(heights[r], this.cells[r][c].realHeight().get());
       }
     }
 
-    var xmargin = this.xmargin().orElse(0);
-    var ymargin = this.ymargin().orElse(0);
+    var xmargin = this.xmargin().getOrElse(0);
+    var ymargin = this.ymargin().getOrElse(0);
 
     // If desire a different width/height, change the widths/heights
     // by shrinking the excess.
-    var totalWidth = xmargin.mul(this.numCols - 1);
-    for (var c = 0; c < this.numCols; c++) totalWidth = totalWidth.add(widths[c]);
-    var extraWidth = this.width().orElse(totalWidth).sub(totalWidth).div(this.numCols);
-    for (var c = 0; c < this.numCols; c++) widths[c] = widths[c].add(extraWidth);
+    var totalWidth = xmargin * (this.numCols - 1);
+    for (var c = 0; c < this.numCols; c++) totalWidth += widths[c];
+    var extraWidth = (this.width().getOrElse(totalWidth) - totalWidth) / this.numCols;
+    for (var c = 0; c < this.numCols; c++) widths[c] += extraWidth;
+    totalWidth += extraWidth;
 
-    var totalHeight = ymargin.mul(this.numRows - 1);
-    for (var r = 0; r < this.numRows; r++) totalHeight = totalHeight.add(heights[r]);
-    var extraHeight = this.height().orElse(totalHeight).sub(totalHeight).div(this.numRows);
-    for (var r = 0; r < this.numRows; r++) heights[r] = heights[r].add(extraHeight);
+    var totalHeight = ymargin * (this.numRows - 1);
+    for (var r = 0; r < this.numRows; r++) totalHeight += heights[r];
+    var extraHeight = (this.height().getOrElse(totalHeight) - totalHeight) / this.numRows;
+    for (var r = 0; r < this.numRows; r++) heights[r] += extraHeight;
+    totalHeight += extraHeight;
 
     // Starting positions
-    var xstart = [sfig.tconstant(0)];
-    var ystart = [sfig.tconstant(0)];
+    var xstart = [0];
+    var ystart = [0];
     for (var c = 1; c <= this.numCols; c++)
-      xstart[c] = xstart[c-1].add(widths[c-1]).add(c < this.numCols ? xmargin : 0);
+      xstart[c] = xstart[c-1] + widths[c-1] + (c < this.numCols ? xmargin : 0);
     for (var r = 1; r <= this.numRows; r++)
-      ystart[r] = ystart[r-1].add(heights[r-1]).add(r < this.numRows ? ymargin : 0);
+      ystart[r] = ystart[r-1] + heights[r-1] + (r < this.numRows ? ymargin : 0);
 
     function justifyToPivot(justify) {
       if (justify == 'l') return -1;
@@ -1878,23 +1979,35 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
 
     // Display the table
-    var blocks = [];
+    this.elem = sfig_.newSvgElem('g');
     for (var r = 0; r < this.numRows; r++) {
       for (var c = 0; c < this.numCols; c++) {
-        var item = this.contents[r][c];
-
-        // Put contents in a cell of the right space and pivot
         var cell = this.cells[r][c];
-        cell.content.bg.dim(widths[c], heights[r]).end;
-        cell.content.pivot(item.xparentPivot().orElse(xjustify[c].apply(justifyToPivot)),
-                           item.yparentPivot().orElse(yjustify[r].apply(justifyToPivot)));
 
-        // Move the cell into the right position
-        cell.pivot(-1, -1).shift(xstart[c], ystart[r]);
+        // Compute the offset
+        var xpivot = cell.xparentPivot().getOrElse(justifyToPivot(xjustify[c]));
+        var ypivot = cell.yparentPivot().getOrElse(justifyToPivot(yjustify[r]));
+        var xoffset = (xstart[c] + 0.5 * (xpivot + 1) * widths[c]) -
+                      (cell.left().getOrDie() + 0.5 * (xpivot + 1) * cell.realWidth().getOrDie());
+        var yoffset = (ystart[r] + 0.5 * (ypivot + 1) * heights[r]) -
+                      (cell.top().getOrDie() + 0.5 * (ypivot + 1) * cell.realHeight().getOrDie());
+
+        //sfig.L(xoffset, yoffset, cell);
+
+        // Shift the cell element
+        this.elem.appendChild(sfig_.translateElem(cell.elem, xoffset, yoffset));
+
+        // Manually update the bounding box of the children
+        cell.updateBBox(sfig_.shiftMatrix(xoffset, yoffset));
       }
     }
+
+    // Manually set bounding box.
+    this.left(0).top(0).realWidth(totalWidth).realHeight(totalHeight);
+    this.bboxIsSet = true;
+
+    callback();
   };
-  sfig_.inheritsFrom('Table', Table, sfig.Block);
 
   Table.prototype.center = function() { return this.justify('c', 'c'); }
   sfig_.addPairProperty(Table, 'justify', 'xjustify', 'yjustify', null, null, 'Justification string consisting of l (left), c (center), or r (right)');
@@ -1943,17 +2056,12 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // Combine title and body
     var titleBlock = sfig.frame(sfig.wrap(this.titleBlock).scale(this.titleScale())).pivot(0, 1).bg.strokeWidth(0).dim(this.innerWidth(), this.titleHeight()).end;
-    var body = sfig.frame(this.body).pivot(-1, -1);
-    var block = sfig.ytable(
+    var titleBody = sfig.ytable(
       titleBlock,
-      body,
-    _).ymargin(this.titleSpacing());
+      this.body,
+    _).ymargin(this.titleSpacing()).shift(this.leftPadding(), this.topPadding());
 
-    // Make the slide the desired size
-    block = sfig.overlay(
-      sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth().orElse(0)),
-      block.shift(this.leftPadding(), this.topPadding()),
-    _);
+    var border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
 
     // Add headers and footers
     var leftHeaderBlock = sfig.transform(this.leftHeaderBlock).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale());
@@ -1961,16 +2069,19 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var leftFooterBlock = sfig.transform(this.leftFooterBlock).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale());
     var rightFooterBlock = sfig.transform(this.rightFooterBlock).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale());
 
-    block = sfig.overlay(
+    this.overlay = sfig.overlay(
+      border,
       leftHeaderBlock, rightHeaderBlock,
       leftFooterBlock, rightFooterBlock,
-      sfig.transform(block).pivot(-1, -1),
+      titleBody,
       this.extra != null ? this.extra : _,
     _);
-
-    this.addChild(block);
   };
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
+
+  Slide.prototype.createChildren = function() {
+    this.addChild(this.overlay);
+  }
 
   sfig_.addProperty(Slide, 'title', null, 'Title string to show at top of slide.');
   sfig_.addProperty(Slide, 'titleHeight', 50, 'How much vertical space the title should take up.');
@@ -2012,7 +2123,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   }
 
   // Set default text width based on slide width
-  sfig.Text.defaults.setProperty('width', sfig.slide(null).innerWidth());
+  sfig.Text.defaults.setProperty('width', sfig.slide(null).innerWidth().getOrDie());
 })();
 
 ////////////////////////////////////////////////////////////
@@ -2030,12 +2141,13 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     // The root is shown at level 0
     slide.setProperty('showLevel', 0);
     slide.state = sfig_.newState();
+    slide.freeze();
     this.slides.push(slide);
   }
 
   sfig_.newState = function() {
     return {
-      svg: newSvg(),
+      svg: sfig_.newSvg(),
       // For each level, list of new Blocks to hide/show/animate
       showBlocks: [],
       hideBlocks: [],
@@ -2115,21 +2227,33 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     sfig_.goToPresentation(query, null, null, false);
   });
 
+  function containsText(block, query) {
+    if (block instanceof sfig.Text)
+      return (block.content().get() || '').toString().match(query);
+    for (var i = 0; i < block.children.length; i++)
+      if (containsText(block.children[i], query)) return true;
+    return false;
+  }
+
   registerKey('Jump to slide', ['g'], function(prez, callback) {
-    var query = prompt('Go to which slide (slide id or slide index)?');
+    var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
     if (query == null) return callback();
-    var slideIndex;
-    for (var i = 0; i < prez.slides.length; i++) {
-      var slide = prez.slides[i];
+    var slideIndex = prez.currSlideIndex;
+    var incr = query[0] == '?' ? -1 : +1;
+    var found = false;
+    while (true) {
+      slideIndex = (slideIndex + incr + prez.slides.length) % prez.slides.length;  // Advance slide
+      if (slideIndex == prez.currSlideIndex) break;  // Wrapped around
+      var slide = prez.slides[slideIndex];
       if ((slide.id && slide.id().get() == query) ||
-          (slide.rightFooter && slide.rightFooter().get() == query) ||
-          (''+i == query)) {
-        slideIndex = i;
+          (''+slideIndex == query) ||
+          ((query[0] == '/' || query[0] == '?') && containsText(slide, query.slice(1)))) {
+        found = true;
         break;
       }
     }
 
-    if (slideIndex == null) return callback();
+    if (!found) return callback();
 
     prez.setSlideIndex(slideIndex, function() {
       prez.setLevel(0);
@@ -2140,6 +2264,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   registerKey('Change display mode', ['shift-m'], function(prez, callback) {
     var mode = prompt('Current mode is \''+sfig_.urlParams.mode+'\', enter new mode (\'print\', \'outline\', \'fullScreen\', or \'\'):');
+    if (mode == 'p') mode = 'print';
+    else if (mode == 'o') mode = 'outline';
+    else if (mode == 'f') mode = 'fullScreen';
     if (mode != null) {
       sfig_.urlParams.mode = mode;
       sfig_.serializeUrlParamsToLocation();
@@ -2154,7 +2281,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   });
 
   registerKey('Show help', ['shift-/'], function(prez, callback) {
-    // TODO: make this nicer
+    // TODO: make this less ugly
     var lines = keyBindings.map(function(binding) {
       return '  ' + binding.description + ' [' + binding.keys.join(' ') + ']';
     });
@@ -2163,7 +2290,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Presentation.prototype.processKey = function(key, callback) {
     // This function is sometimes called when rendering isn't completed yet, so just ignore.
-    if (!this.slides[this.currSlideIndex].state.rendered) {
+    if (this.slides[this.currSlideIndex].elem == null) {
       console.log('Dropped '+key+' because current slide not rendered yet');
       return;
     }
@@ -2215,27 +2342,28 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       state.svg.appendChild(slide.elem);
 
       // Set the size of containers for a snug fit
+      var x = slide.left().getOrDie();
+      var y = slide.top().getOrDie();
       var width = slide.realWidth().getOrDie();
       var height = slide.realHeight().getOrDie();
 
+      var desiredWidth, desiredHeight;
       if (sfig_.urlParams.mode == 'fullScreen') {  // Print to fit the screen
-        var scale = 0.92;
-        var desiredWidth = screen.availWidth * scale;
-        var desiredHeight = screen.availHeight * scale;
-        state.svg.setAttribute('width', desiredWidth);
-        state.svg.setAttribute('height', desiredHeight);
-        state.svg.setAttribute('viewBox', [0, 0, width, height].join(' '));
+        var scale = 0.98;
+        desiredWidth = screen.availWidth * scale;
+        desiredHeight = screen.availHeight * scale;
       } else if (sfig_.urlParams.mode == 'print') {  // Print to fit the paper
         var scale = 0.7;
-        state.svg.setAttribute('width', width * scale);
-        state.svg.setAttribute('height', height * scale);
-        state.svg.setAttribute('viewBox', [0, 0, width, height].join(' '));
+        desiredWidth = width * scale;
+        desiredHeight = height * scale;
       } else {  // Original size
-        state.svg.setAttribute('width', width);
-        state.svg.setAttribute('height', height);
+        desiredWidth = width;
+        desiredHeight = height;
       }
 
-      state.rendered = true;
+      state.svg.setAttribute('width', desiredWidth);
+      state.svg.setAttribute('height', desiredHeight);
+      state.svg.setAttribute('viewBox', [x, y, width, height].join(' '));
 
       callback();
     });
@@ -2315,14 +2443,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var level = parseInt(params.level);
     if (level == null || !isFinite(level)) level = 0;
     this.setSlideIndexAndLevel(slideIndex, level, callback);
-  }
-
-  function newSvg() {
-    return sfig_.newSvgElem('svg', {
-      id: 'svg',
-      xmlns: sfig_.svgns,
-      version: '1.1',
-    });
   }
 
   function pageBreak() {
@@ -2406,16 +2526,16 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
 
     for (var i = 0; i < this.slides.length; i++) {
-      var block = this.slides[i];
+      var slide = this.slides[i];
       var div = sfig_.newElem('div');
       div.style.margin = 10;
 
       var title = sfig_.newElem('a');
-      title.innerHTML = ('Slide '+i + (block.title && block.title().get() ? ': '+block.title().get() : '')).bold();
+      title.innerHTML = ('Slide '+i + (slide.title && slide.title().get() ? ': '+slide.title().get() : '')).bold();
       title.href = window.location.pathname + sfig_.serializeUrlParams({slideIndex: i});
       div.appendChild(title);
 
-      var html = blockToHtml(block, false);
+      var html = blockToHtml(slide, false);
       if (html != null) div.appendChild(html);
       container.appendChild(div);
     }
@@ -2470,7 +2590,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.container = container;
 
     // Set up key bindings
-    //var keyQueue = MathJax.Callback.Queue();
     var keyQueue = [];
     function processKeyQueue() {
       if (keyQueue.length == 0) {
@@ -2483,7 +2602,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     document.documentElement.addEventListener('keydown', function(event) {
       if (!sfig_.keysEnabled) return;
       var key = sfig_.eventToKey(event);
-      //keyQueue.Push(function() { self.processKey(key, function() {}); });
       keyQueue.push(key);
       processKeyQueue(function() {});
     }, false);
@@ -2518,8 +2636,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig_.includeScript = function(src) {
     var head = document.head;
-    if (!head) throw 'No head tag';
-
     var script = document.createElement('script');
     script.src = src;
     head.appendChild(script);
@@ -2527,15 +2643,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   }
 
   sfig.initialize = function() {
-    //L('sfig.initialize');
     sfig_.parseUrlParamsFromLocation();
 
     if (sfig.enableMath) {
       var script = sfig_.includeScript('../external/MathJax/MathJax.js?config=default');
       var buf = '';
       buf += 'MathJax.Hub.Config({';
-      if (window.chrome) // Need this right now
-        buf += 'jax: ["input/TeX", "output/SVG"],';
+      // TODO: want to remove this, but Chrome doesn't work without it.
+      if (window.chrome) buf += '  jax: ["input/TeX", "output/SVG"],';
       buf += '  extensions: ["tex2jax.js"],';
       buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
       buf += '  TeX: { Macros: {';
@@ -2553,7 +2668,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
 
     sfig_.initialized = true;
-    //L('MathJax config = '+buf);
   }
 
   sfig_.goToPresentation = function(name, slideId, level, newWindow) {

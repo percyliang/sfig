@@ -2,8 +2,8 @@
 // Feel free to copy this to use as a template.
 
 sfig.importMethods(this, [
-  '_', 'pause', 'center', 'parentCenter',
-  'circle', 'square', 'ellipse',
+  '_', 'let', 'pause', 'center', 'parentCenter',
+  'circle', 'square', 'ellipse', 'rect',
   'xtable', 'ytable', 'table',
   'frame', 'wrap', 'overlay', 'transform', 'slide',
   'textBox', 'text',
@@ -18,11 +18,11 @@ var slideNum = 0;
 function add(block) { slideNum++; prez.addSlide(block.rightFooter(slideNum)); }
 
 // Show an example alongside the rendered output
-function example(code) {
+function example(code, options) {
   var target = wrap(eval(code));
-  var numLines = code.split('\n').length;
+  var numRows = (options && options.numRows) || code.split('\n').length;
   return frame(xtable(
-    textBox().size(50, numLines).content(code).onEnter(function(box) {
+    textBox().size(50, numRows).content(code).onEnter(function(box) {
       var input = box.content().get();
       var output = eval(input);
       target.resetContent(output);
@@ -34,24 +34,29 @@ function example(code) {
 }
 
 prez.addSlide(slide('',
-  parentCenter('sfig tutorial').scale(1.5).strokeColor('darkblue'),
-  parentCenter('Percy Liang'),
+  parentCenter('<b>sfig</b>').scale(2).strokeColor('darkblue'),
+  'sfig is a Javascript library for creating SVG-based presentations and figures.  Here\'s an example:',
+  example("circle(20).color('blue')", {numRows: 4}),
+  'You can edit the Javascript code (e.g., try changing the color to red) and press ctrl-enter to see the updated result.',
+  'Use the arrow keys to move between slides.  Press \'?\' for help.',
+  text('Download the code on GitHub.').linkToUrl('http://github.com/percyliang/sfig'),
 _).id('title'));
 
-add(slide('What is sfig?',
-  'sfig is a Javascript library for producing SVG-based presentations and figures.',
-  'To jump right in, we can draw a blue circle with radius 20:',
-  example("circle(20).color('blue')"),
-  'This command creates a <b>Block</b> object, which is later rendered into SVG.',
-  'You can edit the code and press ctrl-enter to see the updated result.',
+add(slide('Why sfig?',
+  'As motivation, consider the task of drawing nodes with labels inside:',
+  example("function node(s) {\n  l = text(s)\n  c = ellipse(l.realWidth().mul(0.7),\n              l.realHeight().mul(0.7))\n  return overlay(l, c).center()\n}\na = node('$G_{n,p}$')\nb = node('graph')\nxtable(a, b).center().margin(40)"),
+  '<b>Factor out form and content</b>: figures often have recurring elements which display different content in the same form (e.g., circled nodes).  Using code, we can define the form <em>once</em> in a function and use it with different content (e.g., <tt>node(\'algorithm\')</tt>, <tt>node(\'graph\')</tt>).',
+  '<b>Relative layout</b>: creating figures by code would be tedious if we had to specify the absolute sizes/positions of all the elements.  sfig offers constructs (e.g., <tt>overlay</tt>, <tt>xtable</tt>) to specify control layout in a higher-level way.',
+  '<b>MathJax integration</b>: Embed $\\LaTeX$ seamlessly into your figures.',
 _));
 
-add(slide('Setting properties',
-  'It is easy to set the properties of Blocks by chaining them:',
+add(slide('Blocks and properties',
+  'The basic unit in sfig is called a <b>Block</b> (includes text, circles, rectangles, etc.). A Block has various properties which specifies all the information to render into an SVG element.',
+  'We can set the properties of Blocks by chaining them as follows:',
   example("c = square(40)\nc.strokeColor('blue').fillColor('red')\nc.strokeWidth(2).opacity(0.5)"),
   'We can also transform Blocks:',
   example("square(40).scale(0.8).rotate(45)"),
-  'Properties can be overridden:',
+  'Properties can be also overridden:',
   example("ellipse(40, 20).xradius(10)"),
 _));
 
@@ -89,9 +94,9 @@ add(slide('Tables',
   'A Table is built from a two-dimensional matrix of Blocks.',
   'It uses the bounding boxes of the Blocks to position.',
   'By default, everything is left justified:',
-  example("table(['cat', 'dog'], ['caterpillar', circle(20)])\n  .margin(10)"),
+  example("table(['cat', 'dog'], ['caterpillar', circle(40)])\n  .margin(10)"),
   'We can re-justify (l is left, c is center, r is right):',
-  example("table(['cat', 'dog'], ['caterpillar', circle(20)])\n  .margin(10).justify('cl', 'r')"),
+  example("table(['cat', 'dog'], ['caterpillar', circle(40)])\n  .margin(10).justify('cl', 'r')"),
   'The first argument (cl) corresponds to the x-axis and the second (r) to the y-axis.',
 _))
 
@@ -127,6 +132,69 @@ add(slide('Animation',
   example("circle(20).color('blue').animate.opacity(0).end"),
 _));
 
+function equationEditor() {
+  var example = '\\alpha^2';
+  function convert(str) { return '$\\displaystyle ' + str + '$'; }
+  var target = wrap(convert(example));
+  return parentCenter(ytable(
+    textBox().size(50, 1).content(example).onEnter(function(box) {
+      target.resetContent(convert(box.content().get()));
+      prez.refresh(function() { box.textElem.focus(); });
+    }),
+    target,
+  _).center().ymargin(10));
+}
+
+function timeSeriesPlotter() {
+  //var example = '1 1\n4 2\n9 3\n16 4';
+  var example = 'Baseline 40 73.2 90 88\nImproved 60 75 91 95';
+  function convert(str) {
+    var lines = str.split('\n');
+    var trajectoryNames = [];
+    var trajectories = [];
+    for (var i = 0; i < lines.length; i++) {
+      var tokens = lines[i].split(/\s+/).filter(function(x) { return x != ''; });
+      if (!isFinite(tokens[0])) {
+        trajectoryNames.push(tokens[0]);
+        trajectories.push(tokens.slice(1).map(parseFloat));
+      } else {
+        tokens = tokens.map(parseFloat);
+        for (var j = 1; j < tokens.length; j++) {
+          var trajectory = trajectories[j-1];
+          if (trajectory == null) trajectory = trajectories[j-1] = [];
+          trajectory.push({x:tokens[0], y:tokens[j]});
+        }
+      }
+    }
+    var graph = new sfig.LineGraph(trajectories);
+    graph.trajectoryNames(trajectoryNames);
+    graph.axisLabel('iteration', 'value $\\alpha$');
+    graph.marker(sfig.Graph.circleMarker);
+    graph.trajectoryColors(['red', 'blue', 'green']);
+    graph.legendPivot(1, 1);
+    graph.numTicks(10, 5).yrange(0, 100).roundPlaces(0).tickIncrValue(1, 20);
+    return graph;
+  }
+  var target = wrap(convert(example));
+  return parentCenter(xtable(
+    textBox().size(30, 10).content(example).onEnter(function(box) {
+      target.resetContent(convert(box.content().get()));
+      prez.refresh(function() { box.textElem.focus(); });
+    }),
+    target,
+  _).center().ymargin(10));
+}
+
+add(slide('Example Tools',
+  'sfig can be used to build quick interactive tools.',
+
+  '<b>Render a LaTeX equation</b>:',
+  equationEditor(),
+
+  '<b>Plot time series</b> (format is "name $x_1$ $x_2$..." or "$x_1$ $y_1$\\n$x_2$ $y_2$\\n..."):',
+  timeSeriesPlotter(),
+_));
+
 add(slide('From Blocks to SVG elements',
   bulletedText([null,
     'All the code so far only generates Blocks, which contain all the necessary information to render into SVG.',
@@ -134,11 +202,19 @@ add(slide('From Blocks to SVG elements',
       'Allows modification of the Block\'s properties after contstruction',
       'Allows us to manipulate the higher-level Block in various ways before rendering (possibly in different ways).',
     ],
+    ['The life of a Block has three stages:',
+      'Construction and setting its properties [<tt>c = circle(10).color(\'blue\')</tt>]',
+      ['Creating children from properties [<tt>c.freeze()</tt>, which calls <tt>c.createChildren()</tt>].  There are two ways this stage will use the properties:',
+        'Indirectly [<tt>c.xradius().add(3)</tt>]: can manipulate properties which might depend on some Block\'s rendered properties (e.g., realWidth)',
+        'Directly [<tt>c.strokeColor().get() + 3</tt>]: can use actual values to control the identity of the children Blocks created',
+      ],
+      'Rendering [<tt>c.renderElem(...)</tt> sets <tt>c.elem</tt> and properties such as realWidth]',
+    ],
   ]),
 _));
 
 add(slide('To be completed...',
-  bulletedText([null, 'Levels', 'Slides', 'Frames', 'Transforms', 'ParseTree', 'd3']), 
+  bulletedText([null, 'Level', 'Slide', 'Frame', 'Transform', 'RootedTree', 'Graph', 'd3']), 
 _));
 
 function onLoad() { prez.run(); }

@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// RootedTree
+// RootedTree: for drawing parse trees.
 
 (function() {
   // A RootedTreeBranch contains an edge and a child.
@@ -22,11 +22,9 @@
     RootedTree.prototype.constructor.call(this);
     items = sfig.std(items);
 
-    var blocks = [];
-
     // Branches
-    this.branches = [];
-    var children = [];
+    var children = [];  // Children trees
+    this.branches = [];  // Branches include information about child trees and edge labels
     for (var i = 1; i < items.length; i++) {
       var item = items[i];
       if (item instanceof sfig.RootedTreeBranch) {
@@ -34,72 +32,99 @@
         var branch = item;
         this.branches.push(branch);
         children.push(branch.child);
-      } else if ((item instanceof sfig.Block)) {
-        // Convert RootedTree to branch (with empty edge)
+      } else if (item instanceof sfig.Block) {
+        // Convert RootedTree to branch (with empty edge label)
         var branch = sfig.rootedTreeBranch(null, item);
         this.branches.push(branch);
         children.push(branch.child);
+      } else if (item instanceof sfig.PropertyChanger) {
+        children.push(item);
       } else {
         throw 'Not RootedTreeBranch or Block: '+item;
       }
     }
-    if (this.branches.length > 0) {
-      this.branchesBlock = sfig.table(children).xmargin(this.xmargin());
-      blocks.push(this.branchesBlock);
-    }
+    if (this.branches.length > 0)
+      this.childrenBlock = sfig.table(children).xmargin(this.xmargin());
+    else if (children.length != 0)
+      throw 'Can\'t have children without actual branches';
 
     // Head
     this.head = items[0];
     if (!(this.head instanceof sfig.Block)) throw 'Head must be Block, but got: '+this.head;
 
-    // Place in the middle between first and the last children heads
+    // Center the head in the middle between center of the first and the last children heads
     this.headBox = frame(this.head).bg.round(this.nodeRound()).end;
+    this.headBox.bg.level(this.head.showLevel(), this.head.hideLevel());
     this.headBox.setEnd(this);
     this.headBox.padding(this.nodePadding()).strokeWidth(this.nodeBorderWidth());
     if (this.branches.length > 0) {
       var a = this.branches[0].child.headBox;
       var b = this.branches[this.branches.length-1].child.headBox;
       var x = a.xmiddle().add(b.xmiddle()).div(2);
-      var y = this.branchesBlock.top().sub(this.ymargin());
+      var y = this.childrenBlock.top().sub(this.ymargin());
       this.headBox = transform(this.headBox).pivot(0, +1).shift(x, y);
     }
-    blocks.push(this.headBox);
+  };
+  sfig_.inheritsFrom('RootedTree', RootedTree, sfig.Block);
 
-    // Connect head with branch heads
+  RootedTree.prototype.createChildren = function() {
+    // Need to render children trees first to know where to place head and edges.
+    if (this.childrenBlock != null)
+      this.addInitDependency(this.childrenBlock);
+
+    // Head
+    this.addChild(this.headBox);
+
+    // Children
+    if (this.childrenBlock != null)
+      this.addChild(this.childrenBlock);
+
+    // Connect head to children
     for (var i = 0; i < this.branches.length; i++) {
       var b = this.branches[i];
 
-      //b.edge.level(b.child.showLevel(), b.child.hideLevel()); // XXX: doesn't work
-      //Z = b.child.showLevel();
-
-      blocks.push(b.edge);
-
-      // Draw label on edge
-      if (b.edgeLabel != null) {
-        var edgeLabel = sfig.transform(b.edgeLabel).center();
-        edgeLabel.shift(b.edge.xmiddle(), b.edge.ymiddle());
-        blocks.push(edgeLabel);
+      // Edge
+      b.edge.mimic(b.child.head);
+      if (this.verticalCenterEdges().get()) {
+        // Edges meeting at the bottom middle of headBox
+        b.edge.line.p1(this.headBox.xmiddle(), this.headBox.bottom());
+        b.edge.line.p2(b.child.headBox.xmiddle(), b.child.headBox.top());
+      } else {
+        // Edges meeting at the center of headBox
+        b.edge.line.b1(this.headBox);
+        b.edge.line.b2(b.child.headBox);
       }
+      this.addChild(b.edge);
 
-      // Edges meeting at the bottom middle of headBox
-      var v = this.verticalCenterEdges();
-      b.edge.line.p1(v.cond(this.headBox.xmiddle(), null), v.cond(this.headBox.bottom(), null));
-      b.edge.line.p2(v.cond(b.child.headBox.xmiddle(), null), v.cond(b.child.headBox.top(), null));
-
-      // Edges meeting at the center of headBox
-      b.edge.line.b1(v.cond(null, this.headBox));
-      b.edge.line.b2(v.cond(null, b.child.headBox));
+      // Edge label
+      if (b.edgeLabel != null) {
+        var edgeLabel = sfig.center(b.edgeLabel).shift(b.edge.xmiddle(), b.edge.ymiddle());
+        edgeLabel.mimic(b.child.head);
+        this.addChild(edgeLabel);
+      }
     }
-
-    this.addChild(new sfig.Overlay(blocks));
   };
-  sfig_.inheritsFrom('RootedTree', RootedTree, sfig.Block);
 
   sfig_.addPairProperty(RootedTree, 'margin', 'xmargin', 'ymargin', 30, 30, 'Amount of space between siblings and parent/child.');
   sfig_.addProperty(RootedTree, 'nodePadding', 3, 'Amount of space inside a node');
   sfig_.addProperty(RootedTree, 'nodeBorderWidth', 1, 'How thick to make node');
   sfig_.addProperty(RootedTree, 'nodeRound', 5, 'How rounded?');
   sfig_.addProperty(RootedTree, 'verticalCenterEdges', null, 'For drawing parse trees, have edges converge');
+
+  // Add ways to recursively set properties for all descendants.
+  function addRecursiveProperty(recursiveName, name) {
+    RootedTree.prototype[recursiveName] = function() {
+      this[name].apply(this, arguments);
+      for (var i = 0; i < this.branches.length; i++) {
+        var child = this.branches[i].child;
+        child[recursiveName].apply(child, arguments);
+      }
+      return this;
+    }
+  }
+  ['margin', 'xmargin', 'ymargin', 'nodePadding', 'nodeBorderWidth', 'nodeRound', 'verticalCenterEdges'].forEach(function(name) {
+    addRecursiveProperty('rec'+name, name);
+  });
 
   sfig.rootedTree = function() { return new RootedTree(arguments); }
 })();
