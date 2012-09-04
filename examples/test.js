@@ -15,7 +15,7 @@ sfig.importMethods(this, [
 ]);
 
 var prez = sfig.presentation();
-function addToPrez(block) { addToPrez(block); }
+function addToPrez(block) { prez.addSlide(block); }
 
 function testCase(block, elemStr) {
   var marker = circle(2).opacity(0.5).color('red');
@@ -102,12 +102,6 @@ function createSlides() {
     c.transition().duration(1000).attr('r', function(x) { return x; });
     c.on('click', function(x, i) { console.log(x); });
   }));
-
-  // http://g.raphaeljs.com/reference.html
-  addToPrez(ytable('A Pie Chart using gRaphael', rawAddHtml(600, 400, function(container) {
-    Raphael(container).piechart(320, 240, 200, [55, 20, 13], { legend: ['Apples (%%.%)', 'Bananas (%%.%)', 'Cherries (%%.%)'], legendpos: 'east'});
-    //Raphael(container).linechart(0, 0, 600, 400, [1, 2, 3], [[2, 9, 5], [4, 5, 9]], {axis: '0 0 1 1', axisxstep: 10});
-  })));
 
   // Add raw HTML
   addToPrez(frame(rawAddHtml(100, 100, function(container) {

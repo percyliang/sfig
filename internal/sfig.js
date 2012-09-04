@@ -244,7 +244,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       // Copy defaults
       childClass.defaults = new sfig.Properties();
       if (parentClass.defaults != null)
-        childClass.defaults.from(parentClass.defaults);
+        childClass.defaults.from(parentClass.defaults, true);
     }
     childClass.prototype.className = className;
     childClass.prototype.myClass = childClass;
@@ -451,14 +451,19 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   var Properties = sfig.Properties = function() {
     // Mapping from property name to a Thunk representing the value
     this.properties = {};
-    if (this.myClass.defaults != null) this.from(this.myClass.defaults);
+    if (this.myClass.defaults != null) this.from(this.myClass.defaults, true);
   }
   sfig_.inheritsFrom('Properties', Properties, Object);
 
-  // Copy properties of |source| to |this|.
-  Properties.prototype.from = function(source) {
-    for (var name in source.properties)
-      this.setProperty(name, source.getProperty(name).getOrDie());
+  // Copy properties of |source| to |this| by value.
+  // get = false -> copy by reference
+  // get = true -> copy by value
+  Properties.prototype.from = function(source, get) {
+    for (var name in source.properties) {
+      var value = source.getProperty(name);
+      if (get) value = value.get();
+      this.setProperty(name, value);
+    }
     return this;
   }
 
