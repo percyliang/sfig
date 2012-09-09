@@ -2060,6 +2060,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     Slide.prototype.constructor.call(this);
     this.contents = contents;
     this.extra = extra;
+
+    this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
+    this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
+    this.body.setEnd(this);
   };
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
 
@@ -2068,9 +2072,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (!(this.titleBlock instanceof sfig.Block))
       this.titleBlock = sfig.text(this.titleBlock).strokeColor(this.titleColor());
     this.titleBlock.setEnd(this);
-    this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
-    this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
-    this.body.setEnd(this);
 
     // Must create all text objects in the constructor because they must be added to children
     this.leftHeaderBlock = sfig.text(this.leftHeader().orElse(''));
