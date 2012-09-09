@@ -8,6 +8,7 @@
     if (child == null) throw 'No child: '+child;
     this.child = (child instanceof sfig.RootedTree) ? child : sfig.rootedTree(child);
     this.edge = sfig.decoratedLine(false, false); // No arrows, end points set later
+    this.edge.setEnd(this);
   }
   sfig_.inheritsFrom('RootedTreeBranch', RootedTreeBranch, sfig.AuxiliaryInfo);
 
@@ -56,13 +57,15 @@
     this.headBox = frame(this.head).bg.round(this.nodeRound()).end;
     this.headBox.bg.level(this.head.showLevel(), this.head.hideLevel());
     this.headBox.setEnd(this);
-    this.headBox.padding(this.nodePadding()).strokeWidth(this.nodeBorderWidth());
+    this.headBox.padding(this.nodePadding());
+    this.headBox.bg.strokeWidth(this.nodeBorderWidth());
+    this.headBox = transform(this.headBox);
     if (this.branches.length > 0) {
       var a = this.branches[0].child.headBox;
       var b = this.branches[this.branches.length-1].child.headBox;
       var x = a.xmiddle().add(b.xmiddle()).div(2);
       var y = this.childrenBlock.top().sub(this.ymargin());
-      this.headBox = transform(this.headBox).pivot(0, +1).shift(x, y);
+      this.headBox.pivot(0, +1).shift(x, y);
     }
   };
   sfig_.inheritsFrom('RootedTree', RootedTree, sfig.Block);
@@ -103,6 +106,8 @@
         this.addChild(edgeLabel);
       }
     }
+    
+    if (this.tail().get() != null) this.addChild(this.tail().get());
   };
 
   sfig_.addPairProperty(RootedTree, 'margin', 'xmargin', 'ymargin', 30, 30, 'Amount of space between siblings and parent/child.');
@@ -110,6 +115,7 @@
   sfig_.addProperty(RootedTree, 'nodeBorderWidth', 1, 'How thick to make node');
   sfig_.addProperty(RootedTree, 'nodeRound', 5, 'How rounded?');
   sfig_.addProperty(RootedTree, 'verticalCenterEdges', null, 'For drawing parse trees, have edges converge');
+  sfig_.addProperty(RootedTree, 'tail', null, 'Draw this after everything');
 
   // Add ways to recursively set properties for all descendants.
   function addRecursiveProperty(recursiveName, name) {

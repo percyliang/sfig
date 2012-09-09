@@ -10,6 +10,7 @@ var sfig_ = {}; // Namespace of private members.
 sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
+sfig.defaultBgColor = 'white';
 
 sfig.enableMath = true;  // Whether to render LaTeX math using MathJax.
 sfig.enableAnimations = true;  // Whether to allow animations.
@@ -1700,8 +1701,16 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig.polyline = function() { return new Poly().points(Array.prototype.slice.call(arguments)).closed(false); }
   sfig.polygon = function() { return new Poly().points(Array.prototype.slice.call(arguments)).closed(true); }
-  sfig.xline = function(length) { return polyline([0, 0], [length, 0]); }
-  sfig.yline = function(length) { return polyline([0, 0], [0, length]); }
+  sfig.eqTriangle = function(side) {
+    var length = side * 0.5 * Math.sqrt(3);
+    var width = side;
+    return sfig.polygon([0,0], [-width/2, length], [+width/2, length]);
+  }
+  sfig.xline = function(length) { return sfig.polyline([0, 0], [length, 0]); }
+  sfig.yline = function(length) { return sfig.polyline([0, 0], [0, length]); }
+  
+  sfig.xspace = function(length) { return sfig.xline(length).color(sfig.defaultBgColor); }
+  sfig.yspace = function(length) { return sfig.yline(length).color(sfig.defaultBgColor); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1736,14 +1745,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 // properties of the underlying object.
 
 (function() {
-  var Wrap = sfig.Wrap = function(content) {
+  var Wrap = sfig.Wrap = function() {
     Wrap.prototype.constructor.call(this);
-    this.content = sfig.std(content);
   };
   sfig_.inheritsFrom('Wrap', Wrap, sfig.Block);
 
   Wrap.prototype.createChildren = function() {
-    this.addChild(this.content);
+    var content = this.content();
+    if (content.exists()) this.addChild(content.get());
   }
 
   Wrap.prototype.resetContent = function(content) {
@@ -1753,7 +1762,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     root.freeze();
   }
 
-  sfig.wrap = function(block) { return new sfig.Wrap(block); }
+  sfig_.addProperty(Wrap, 'content', null, 'What to draw');
+
+  sfig.wrap = function(block) { return new sfig.Wrap().content(block); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1849,17 +1860,26 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   var Frame = sfig.Frame = function(content) {
     Frame.prototype.constructor.call(this);
     this.content = sfig.std(content);
+    this.content.setEnd(this);
     this.bg = new sfig.Rect();
     this.bg.setEnd(this);
+    this.titleBlock = new sfig.Wrap();
 
-    this.overlay = sfig.overlay(this.bg, this.content);
+    var bg = sfig.overlay(
+      this.bg,
+      transform(this.titleBlock).pivot(-1, 0).xshift(10),
+    _);
+    this.overlay = sfig.overlay(bg, this.content);
     this.overlay.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
   };
   sfig_.inheritsFrom('Frame', Frame, sfig.Block);
 
   Frame.prototype.createChildren = function() {
     var strokeWidth = this.bg.strokeWidth();
-    if (!strokeWidth.exists()) strokeWidth.set(0);
+    if (!strokeWidth.exists()) strokeWidth.set(0);  // Default
+
+    var title = this.title();
+    if (title.exists()) this.titleBlock.content(sfig.std(title.get()));
 
     // Make |bg| a bit bigger than |content| so that it fits snuggly without overlapping.
     var extra = strokeWidth.get() / 2;
@@ -1878,8 +1898,11 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   Frame.prototype.center = function() { return this.pivot(0, 0); }
   sfig_.addPairProperty(Frame, 'pivot', 'xpivot', 'ypivot', null, null, 'A relative scaling (between [-1,1]) determines position of each child.  Make each of these positions coincide.');
   sfig_.addPairProperty(Frame, 'padding', 'xpadding', 'ypadding', null, null, 'Amount of space to put around the object');
+  sfig_.addProperty(Frame, 'title', null, 'Title to put on the border');
 
   sfig.frame = function(block) { return new Frame(block); }
+
+  sfig.opaquebg = function(block, color) { return sfig.frame(block).bg.color(color || sfig.defaultBgColor).end; }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1956,17 +1979,23 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // If desire a different width/height, change the widths/heights
     // by shrinking the excess.
-    var totalWidth = xmargin * (this.numCols - 1);
-    for (var c = 0; c < this.numCols; c++) totalWidth += widths[c];
-    var extraWidth = (this.width().getOrElse(totalWidth) - totalWidth) / this.numCols;
-    for (var c = 0; c < this.numCols; c++) widths[c] += extraWidth;
-    totalWidth += extraWidth;
+    var totalWidth = 0;
+    if (this.numCols > 0) {
+      totalWidth += xmargin * (this.numCols - 1);
+      for (var c = 0; c < this.numCols; c++) totalWidth += widths[c];
+      var extraWidth = (this.width().getOrElse(totalWidth) - totalWidth) / this.numCols;
+      for (var c = 0; c < this.numCols; c++) widths[c] += extraWidth;
+      totalWidth += extraWidth;
+    }
 
-    var totalHeight = ymargin * (this.numRows - 1);
-    for (var r = 0; r < this.numRows; r++) totalHeight += heights[r];
-    var extraHeight = (this.height().getOrElse(totalHeight) - totalHeight) / this.numRows;
-    for (var r = 0; r < this.numRows; r++) heights[r] += extraHeight;
-    totalHeight += extraHeight;
+    var totalHeight = 0;
+    if (this.numRows > 0) {
+      totalHeight += ymargin * (this.numRows - 1);
+      for (var r = 0; r < this.numRows; r++) totalHeight += heights[r];
+      var extraHeight = (this.height().getOrElse(totalHeight) - totalHeight) / this.numRows;
+      for (var r = 0; r < this.numRows; r++) heights[r] += extraHeight;
+      totalHeight += extraHeight;
+    }
 
     // Starting positions
     var xstart = [0];
@@ -1996,8 +2025,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
                       (cell.left().getOrDie() + 0.5 * (xpivot + 1) * cell.realWidth().getOrDie());
         var yoffset = (ystart[r] + 0.5 * (ypivot + 1) * heights[r]) -
                       (cell.top().getOrDie() + 0.5 * (ypivot + 1) * cell.realHeight().getOrDie());
-
-        //sfig.L(xoffset, yoffset, cell);
 
         // Shift the cell element
         this.elem.appendChild(sfig_.translateElem(cell.elem, xoffset, yoffset));
@@ -2031,13 +2058,19 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 (function() {
   var Slide = sfig.Slide = function(contents, extra) {
     Slide.prototype.constructor.call(this);
+    this.contents = contents;
+    this.extra = extra;
+  };
+  sfig_.inheritsFrom('Slide', Slide, sfig.Block);
 
-    this.titleBlock = sfig.text(this.title().orElse('')).strokeColor(this.titleColor());
+  Slide.prototype.createChildren = function() {
+    this.titleBlock = this.title().getOrElse('');
+    if (!(this.titleBlock instanceof sfig.Block))
+      this.titleBlock = sfig.text(this.titleBlock).strokeColor(this.titleColor());
     this.titleBlock.setEnd(this);
-    this.body = sfig.ytable.apply(null, contents).ymargin(this.bodySpacing());
+    this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
     this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
     this.body.setEnd(this);
-    this.extra = extra;
 
     // Must create all text objects in the constructor because they must be added to children
     this.leftHeaderBlock = sfig.text(this.leftHeader().orElse(''));
@@ -2074,19 +2107,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     var leftFooterBlock = sfig.transform(this.leftFooterBlock).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale());
     var rightFooterBlock = sfig.transform(this.rightFooterBlock).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale());
 
-    this.overlay = sfig.overlay(
-      border,
-      leftHeaderBlock, rightHeaderBlock,
-      leftFooterBlock, rightFooterBlock,
-      titleBody,
-      this.extra != null ? this.extra : _,
-    _);
+    this.addChild(border);
+    this.addChild(leftHeaderBlock);
+    this.addChild(rightHeaderBlock);
+    this.addChild(leftFooterBlock);
+    this.addChild(rightFooterBlock);
+    this.addChild(titleBody);
+    if (this.extra != null) this.addChild(this.extra);
   };
-  sfig_.inheritsFrom('Slide', Slide, sfig.Block);
-
-  Slide.prototype.createChildren = function() {
-    this.addChild(this.overlay);
-  }
 
   sfig_.addProperty(Slide, 'title', null, 'Title string to show at top of slide.');
   sfig_.addProperty(Slide, 'titleHeight', 50, 'How much vertical space the title should take up.');
@@ -2386,6 +2414,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     if (targetLevel == sfig_.maxLevel) targetLevel = self.currMaxLevel();
 
+    // If first time, need to clear everything
+    if (self.currLevel == -1) {
+      for (var i = 0; i <= self.currMaxLevel(); i++) {
+        var showBlocks = state.showBlocks[i];
+        if (showBlocks) showBlocks.forEach(function(block) { block.hide(true); });
+      }
+    }
+
     // Go forward
     for (; self.currLevel < targetLevel && self.currLevel < self.currMaxLevel(); self.currLevel++) {
       var hideBlocks = state.hideBlocks[self.currLevel+1];
@@ -2650,8 +2686,18 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig.initialize = function() {
     sfig_.parseUrlParamsFromLocation();
 
+    // Hack: find where this file (sfig.js) is.
+    // Assume the external directory is one level down.
+    var scripts = document.getElementsByTagName('script');
+    var parentDir = '.';
+    for (var i = 0; i < scripts.length; i++) {
+      var file = scripts[i].src;
+      if (!file.match(/sfig\.js$/)) continue;
+      parentDir = file.replace(/\/[^\/]*$/, '');
+    }
+
     if (sfig.enableMath) {
-      var script = sfig_.includeScript('../external/MathJax/MathJax.js?config=default');
+      var script = sfig_.includeScript(parentDir + '/../external/MathJax/MathJax.js?config=default');
       var buf = '';
       buf += 'MathJax.Hub.Config({';
       // TODO: want to remove this, but Chrome doesn't work without it.
