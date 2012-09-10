@@ -1756,7 +1756,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Wrap.prototype.createChildren = function() {
     var content = this.content();
-    if (content.exists()) this.addChild(content.get());
+    if (content.exists()) this.addChild(sfig.std(content.get()));
   }
 
   Wrap.prototype.resetContent = function(content) {
@@ -2179,18 +2179,20 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     slide = sfig.std(slide);
     if (!(slide instanceof sfig.Block)) throw 'Slide must be Block, but got: '+slide;
 
-    // Add slide index
-    if (slide.showIndex().get()) slide.rightFooter(this.slides.length)
+    if (slide instanceof sfig.Slide) {
+      // Add slide index
+      if (slide.showIndex().get()) slide.rightFooter(this.slides.length)
 
-    // Add comments and help
-    var items = [];
-    if (slide.comments().exists()) {
-      var comments = slide.comments().get();
-      if (comments instanceof Array) comments = comments.join('\n');
-      items.push(text('[Comments]').tooltip(comments));
+      // Add comments and help
+      var items = [];
+      if (slide.comments().exists()) {
+        var comments = slide.comments().get();
+        if (comments instanceof Array) comments = comments.join('\n');
+        items.push(text('[Comments]').tooltip(comments));
+      }
+      items.push(sfig.text('[Help]').tooltip(this.getHelpString()));
+      slide.rightHeader(sfig.table(items).xmargin(5));
     }
-    items.push(text('[Help]').tooltip(this.getHelpString()));
-    slide.rightHeader(table(items).xmargin(5));
 
     // The root is shown at level 0
     slide.showLevel(0);
