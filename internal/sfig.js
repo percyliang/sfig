@@ -7,6 +7,7 @@ var sfig_ = {}; // Namespace of private members.
 ////////////////////////////////////////////////////////////
 // Default parameters which can be overridden.
 
+sfig.version = '1.0';
 sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
@@ -140,6 +141,18 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig_.rectToString = function(r) { return r.x+','+r.y+';'+r.width+'x'+r.height; }
   sfig_.svg = sfig_.newSvg();
+
+  sfig_.robustMin = function(a, b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    return Math.min(a, b);
+  }
+
+  sfig_.robustMax = function(a, b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    return Math.max(a, b);
+  }
 
   sfig_.shiftMatrix = function(xshift, yshift) {
     var ctm = sfig_.svg.createSVGMatrix();
@@ -427,8 +440,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   var sub = function(a, b) { return a == null || b == null ? null : a - b; }
   var mul = function(a, b) { return a == null || b == null ? null : a * b; }
   var div = function(a, b) { return a == null || b == null ? null : a / b; }
-  var min = function(a, b) { return a == null || b == null ? null : Math.min(a, b); }
-  var max = function(a, b) { return a == null || b == null ? null : Math.max(a, b); }
+  var min = sfig_.robustMin;
+  var max = sfig_.robustMax;
   var and = function(a, b) { return a && b; }
   var or = function(a, b) { return a || b; }
   var not = function(a) { return !a; }
@@ -831,18 +844,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     return sfig.defaultStrokeWidth;
   }
 
-  function robustMin(a, b) {
-    if (a == null) return b;
-    if (b == null) return a;
-    return Math.min(a, b);
-  }
-
-  function robustMax(a, b) {
-    if (a == null) return b;
-    if (b == null) return a;
-    return Math.max(a, b);
-  }
-
   // Set this.elem to the rendered element and update all the bounding boxes recursively.
   Block.prototype.applyTransforms = function(state) {
     // Perform transforms (remember to update the bounding boxes recursively).
@@ -908,10 +909,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         this.children.forEach(function(child) {
           if (child.elem == null) throw 'Child not rendered: '+child;
           if (!child.orphan().get()) {
-            x0 = robustMin(x0, child.left().get());
-            y0 = robustMin(y0, child.top().get());
-            x1 = robustMax(x1, child.right().get());
-            y1 = robustMax(y1, child.bottom().get());
+            x0 = sfig_.robustMin(x0, child.left().get());
+            y0 = sfig_.robustMin(y0, child.top().get());
+            x1 = sfig_.robustMax(x1, child.right().get());
+            y1 = sfig_.robustMax(y1, child.bottom().get());
           }
         });
         if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
@@ -949,10 +950,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         p.x = x + width * s[0];
         p.y = y + height * s[1];
         p = p.matrixTransform(ctm);
-        x0 = robustMin(x0, p.x);
-        y0 = robustMin(y0, p.y);
-        x1 = robustMax(x1, p.x);
-        y1 = robustMax(y1, p.y);
+        x0 = sfig_.robustMin(x0, p.x);
+        y0 = sfig_.robustMin(y0, p.y);
+        x1 = sfig_.robustMax(x1, p.x);
+        y1 = sfig_.robustMax(y1, p.y);
       });
 
       if (x0 != null) this.left(x0).top(y0).realWidth(x1-x0).realHeight(y1-y0);
@@ -1319,6 +1320,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       if (content) text.value = content;
     } else {
       text = sfig_.newElem('textarea');
+      text.setAttribute('spellcheck', false);
       text.rows = numRows;
       text.cols = numCols;
       if (content) text.appendChild(document.createTextNode(content));
@@ -1366,6 +1368,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.textElem = elem.firstChild;
     callback();
   }
+
+  TextBox.prototype.focus = function() { return this.textElem.focus(); }
 
   sfig_.addProperty(TextBox, 'content', null, 'The string to be displayed.');
   sfig_.addPairProperty(TextBox, 'selection', 'selectionStart', 'selectionEnd', 0, 0, 'Where the cursor is');
@@ -1756,7 +1760,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   }
 
   Wrap.prototype.resetContent = function(content) {
-    this.content = sfig.std(content);
+    this.content(content);
     var root = this.getRoot();
     root.resetRender();
     root.freeze();
@@ -1764,7 +1768,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig_.addProperty(Wrap, 'content', null, 'What to draw');
 
-  sfig.wrap = function(block) { return new sfig.Wrap().content(block); }
+  sfig.wrap = function(block) { return new sfig.Wrap().content(sfig.std(block)); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1804,8 +1808,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     // Resize so that width and height are as desired
     var xscale = this.width().andThen(this.width().div(this.content.realWidth()));
     var yscale = this.height().andThen(this.height().div(this.content.realHeight()));
-    wrapped.xscale(xscale.orElse(yscale));
-    wrapped.yscale(yscale.orElse(xscale));
+    var scale = xscale.min(yscale);
+    wrapped.scale(scale);
+    //wrapped.scale(xscale.orElse(yscale), yscale.orElse(xscale));
 
     this.addChild(wrapped);
   }
@@ -1865,11 +1870,11 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.bg.setEnd(this);
     this.titleBlock = new sfig.Wrap();
 
-    var bg = sfig.overlay(
-      this.bg,
-      transform(this.titleBlock).pivot(-1, 0).xshift(10),
+    var bgWithTitle = sfig.overlay(
+      this.bg,  // Rectangular background
+      transform(this.titleBlock).pivot(-1, 0).xshift(10),  // Title
     _);
-    this.overlay = sfig.overlay(bg, this.content);
+    this.overlay = sfig.overlay(bgWithTitle, this.content);
     this.overlay.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
   };
   sfig_.inheritsFrom('Frame', Frame, sfig.Block);
@@ -1882,15 +1887,19 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (title.exists()) this.titleBlock.content(sfig.std(title.get()));
 
     // Make |bg| a bit bigger than |content| so that it fits snuggly without overlapping.
-    var extra = strokeWidth.get() / 2;
+    var extra = strokeWidth.getOrDie() / 2;
     var width = this.bg.width();
     var height = this.bg.height();
-    if (!width.exists())
-      width.set(this.content.realWidth().add((this.xpadding().getOrElse(0) + extra) * 2));
+    if (!width.exists()) {
+      var contentWidth = this.content.realWidth().add((this.xpadding().getOrElse(0) + extra) * 2);
+      var titleWidth = this.titleBlock.realWidth().add(this.titleIndent().getOrDie() * 2);
+      width.set(contentWidth.max(titleWidth));
+    }
     if (!height.exists())
       height.set(this.content.realHeight().add((this.ypadding().getOrElse(0) + extra) * 2));
 
     this.addInitDependency(this.content);
+    this.addInitDependency(this.titleBlock);
     this.addChild(this.overlay);
   }
 
@@ -1899,6 +1908,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addPairProperty(Frame, 'pivot', 'xpivot', 'ypivot', null, null, 'A relative scaling (between [-1,1]) determines position of each child.  Make each of these positions coincide.');
   sfig_.addPairProperty(Frame, 'padding', 'xpadding', 'ypadding', null, null, 'Amount of space to put around the object');
   sfig_.addProperty(Frame, 'title', null, 'Title to put on the border');
+  sfig_.addProperty(Frame, 'titleIndent', 10, 'Horizontal space between frame and start of title');
 
   sfig.frame = function(block) { return new Frame(block); }
 
@@ -2073,12 +2083,6 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       this.titleBlock = sfig.text(this.titleBlock).strokeColor(this.titleColor());
     this.titleBlock.setEnd(this);
 
-    // Must create all text objects in the constructor because they must be added to children
-    this.leftHeaderBlock = sfig.text(this.leftHeader().orElse(''));
-    this.rightHeaderBlock = sfig.text(this.rightHeader().orElse(''));
-    this.leftFooterBlock = sfig.text(this.leftFooter().orElse(''));
-    this.rightFooterBlock = sfig.text(this.rightFooter().orElse(''));
-
     var _ = sfig._;
 
     //       +                   +
@@ -2102,17 +2106,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     var border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
 
-    // Add headers and footers
-    var leftHeaderBlock = sfig.transform(this.leftHeaderBlock).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale());
-    var rightHeaderBlock = sfig.transform(this.rightHeaderBlock).pivot(+1, -1).shift(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale());
-    var leftFooterBlock = sfig.transform(this.leftFooterBlock).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale());
-    var rightFooterBlock = sfig.transform(this.rightFooterBlock).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale());
-
     this.addChild(border);
-    this.addChild(leftHeaderBlock);
-    this.addChild(rightHeaderBlock);
-    this.addChild(leftFooterBlock);
-    this.addChild(rightFooterBlock);
+
+    // Add headers and footers
+    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale()));
+    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shift(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()));
+    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()));
+    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()));
+
     this.addChild(titleBody);
     if (this.extra != null) this.addChild(this.extra);
   };
@@ -2147,6 +2148,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   sfig_.addProperty(Slide, 'id', null, 'Identifier of the slide');
 
+  sfig_.addProperty(Slide, 'comments', null, 'Identifier of the slide');
+  sfig_.addProperty(Slide, 'showHelp', true, 'Whether to show help');
+  sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices');
+
   sfig.slide = function() {
     var title = arguments[0];
     var contents = Array.prototype.slice.call(arguments, 1);
@@ -2167,13 +2172,29 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   // container is optional
   var Presentation = sfig.Presentation = function() {
     this.slides = [];
+    this.initKeys();
   }
 
   Presentation.prototype.addSlide = function(slide) {
     slide = sfig.std(slide);
     if (!(slide instanceof sfig.Block)) throw 'Slide must be Block, but got: '+slide;
+
+    // Add slide index
+    if (slide.showIndex().get()) slide.rightFooter(this.slides.length)
+
+    // Add comments and help
+    var items = [];
+    if (slide.comments().exists()) {
+      var comments = slide.comments().get();
+      if (comments instanceof Array) comments = comments.join('\n');
+      items.push(text('[Comments]').tooltip(comments));
+    }
+    items.push(text('[Help]').tooltip(this.getHelpString()));
+    slide.rightHeader(table(items).xmargin(5));
+
     // The root is shown at level 0
-    slide.setProperty('showLevel', 0);
+    slide.showLevel(0);
+
     slide.state = sfig_.newState();
     slide.freeze();
     this.slides.push(slide);
@@ -2216,124 +2237,176 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
   }
 
-  // Map from key to [description, func], where func takes two arguments (presentation and callback)
-  var keyMap = {};
-  var keyBindings = []; // List of ([key], description)
-  function registerKey(description, keys, func) {
+  Presentation.prototype.registerKey = function(description, keys, func) {
+    var self = this;
     keys.forEach(function(key) {
-      if (keyMap[key]) throw 'Already registered key '+key;
-      keyMap[key] = {description: description, func: func};
+      if (self.keyMap[key]) throw 'Already registered key '+key;
+      self.keyMap[key] = {description: description, func: func};
     });
-    keyBindings.push({description: description, keys: keys});
+    self.keyBindings.push({description: description, keys: keys});
   }
 
-  registerKey('Go to next slide build', ['space', 'down', 'page_down', 'right', 'j', 'l'], function(prez, callback) {
-    if (prez.currLevel+1 <= prez.currMaxLevel()) {
-      prez.setLevel(prez.currLevel+1);
-      prez.updateUrlParams();
-      callback();
-    } else {
-      prez.showNextSlide(true, callback);
-    }
-  });
+  // Map from key to [description, func], where func takes a single callback argument
+  Presentation.prototype.initKeys = function() {
+    this.keyMap = {};  // key -> description and func
+    this.keyBindings = []; // List of description, keys
+    var self = this;
 
-  registerKey('Go to next slide', ['shift-down', 'shift-right', 'shift-j', 'shift-l'], function(prez, callback) {
-    prez.showNextSlide(false, callback);
-  });
-
-  registerKey('Go to previous slide build', ['backspace', 'up', 'page_up', 'left', 'k', 'h'], function(prez, callback) {
-    if (prez.currLevel-1 >= 0) {
-      prez.setLevel(prez.currLevel-1);
-      prez.updateUrlParams();
-      callback();
-    } else {
-      prez.showPrevSlide(false, callback);
-    }
-  });
-
-  registerKey('Go to previous slide', ['shift-up', 'shift-left', 'shift-k', 'shift-h'], function(prez, callback) {
-    prez.showPrevSlide(false, callback);
-  });
-
-  registerKey('Jump to presentation', ['shift-g'], function(prez, callback) {
-    var query = prompt('Go to which presentation (name)?');
-    if (query == null) return callback();
-    sfig_.goToPresentation(query, null, null, false);
-  });
-
-  function containsText(block, query) {
-    if (block instanceof sfig.Text)
-      return (block.content().get() || '').toString().match(query);
-    for (var i = 0; i < block.children.length; i++)
-      if (containsText(block.children[i], query)) return true;
-    return false;
-  }
-
-  registerKey('Jump to slide', ['g'], function(prez, callback) {
-    var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
-    if (query == null) return callback();
-    var slideIndex = prez.currSlideIndex;
-    var incr = query[0] == '?' ? -1 : +1;
-    var found = false;
-    while (true) {
-      slideIndex = (slideIndex + incr + prez.slides.length) % prez.slides.length;  // Advance slide
-      if (slideIndex == prez.currSlideIndex) break;  // Wrapped around
-      var slide = prez.slides[slideIndex];
-      if ((slide.id && slide.id().get() == query) ||
-          (''+slideIndex == query) ||
-          ((query[0] == '/' || query[0] == '?') && containsText(slide, query.slice(1)))) {
-        found = true;
-        break;
+    this.registerKey('Go to next slide build', ['space', 'down', 'page_down', 'right', 'j', 'l'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      if (self.currLevel+1 <= self.currMaxLevel()) {
+        self.setLevel(self.currLevel+1);
+        self.updateUrlParams();
+        callback();
+      } else {
+        self.showNextSlide(true, callback);
       }
+    });
+
+    this.registerKey('Go to next slide', ['shift-down', 'shift-right', 'shift-j', 'shift-l'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      self.showNextSlide(false, callback);
+    });
+
+    this.registerKey('Go to previous slide build', ['backspace', 'up', 'page_up', 'left', 'k', 'h'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      if (self.currLevel-1 >= 0) {
+        self.setLevel(self.currLevel-1);
+        self.updateUrlParams();
+        callback();
+      } else {
+        self.showPrevSlide(false, callback);
+      }
+    });
+
+    this.registerKey('Go to previous slide', ['shift-up', 'shift-left', 'shift-k', 'shift-h'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      self.showPrevSlide(false, callback);
+    });
+
+    this.registerKey('Jump to presentation', ['shift-g'], function(callback) {
+      var query = prompt('Go to which presentation (name)?');
+      if (query == null) return callback();
+      sfig_.goToPresentation(query, null, null, false);
+    });
+
+    function containsText(block, query) {
+      if (block instanceof sfig.Text)
+        return (block.content().get() || '').toString().match(query);
+      for (var i = 0; i < block.children.length; i++)
+        if (containsText(block.children[i], query)) return true;
+      return false;
     }
 
-    if (!found) return callback();
+    this.registerKey('Jump to slide', ['g'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
+      if (query == null) return callback();
+      var slideIndex = self.currSlideIndex;
+      var incr = query[0] == '?' ? -1 : +1;
+      var found = false;
+      while (true) {
+        slideIndex = (slideIndex + incr + self.slides.length) % self.slides.length;  // Advance slide
+        if (slideIndex == self.currSlideIndex) break;  // Wrapped around
+        var slide = self.slides[slideIndex];
+        if ((slide.id && slide.id().get() == query) ||
+            (''+slideIndex == query) ||
+            ((query[0] == '/' || query[0] == '?') && containsText(slide, query.slice(1)))) {
+          found = true;
+          break;
+        }
+      }
 
-    prez.setSlideIndex(slideIndex, function() {
-      prez.setLevel(0);
-      prez.updateUrlParams();
-      callback();
+      if (!found) return callback();
+
+      self.setSlideIndex(slideIndex, function() {
+        self.setLevel(0);
+        self.updateUrlParams();
+        callback();
+      });
     });
-  });
 
-  registerKey('Change display mode', ['shift-m'], function(prez, callback) {
-    var mode = prompt('Current mode is \''+sfig_.urlParams.mode+'\', enter new mode (\'print\', \'outline\', \'fullScreen\', or \'\'):');
-    if (mode == 'p') mode = 'print';
-    else if (mode == 'o') mode = 'outline';
-    else if (mode == 'f') mode = 'fullScreen';
-    if (mode != null) {
-      sfig_.urlParams.mode = mode;
+    this.registerKey('Toggle full screen', ['shift-f'], function(callback) {
+      if (sfig_.urlParams.mode != 'fullScreen')
+        sfig_.urlParams.mode = 'fullScreen';
+      else
+        sfig_.urlParams.mode = '';
       sfig_.serializeUrlParamsToLocation();
       window.location.reload();
+    });
+    this.registerKey('Outline version', ['shift-o'], function(callback) {
+      sfig_.urlParams.mode = 'outline';
+      sfig_.serializeUrlParamsToLocation();
+      window.location.reload();
+    });
+    this.registerKey('Printer-friendly version', ['shift-p'], function(callback) {
+      sfig_.urlParams.mode = 'print';
+      sfig_.serializeUrlParamsToLocation();
+      window.location.reload();
+    });
+
+    /*this.registerKey('Change display mode', ['shift-m'], function(callback) {
+      var mode = prompt('Current mode is \''+(sfig_.urlParams.mode || '')+'\', enter new mode (\'print\', \'outline\', \'fullScreen\', or \'\'):');
+      if (mode == 'p') mode = 'print';
+      else if (mode == 'o') mode = 'outline';
+      else if (mode == 'f') mode = 'fullScreen';
+      if (mode != null) {
+        sfig_.urlParams.mode = mode;
+        sfig_.serializeUrlParamsToLocation();
+        window.location.reload();
+      }
+    });*/
+
+    this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      sfig_.performOperation('renderAll', function(modifiedCallback) {
+        self.goThroughAllSlides(modifiedCallback);
+      }, callback);
+    });
+
+    // Set up key bindings
+    self.keyQueue = [];
+    function processKeyQueue() {
+      if (self.keyQueue.length == 0) {
+        return;
+      } else {
+        var key = self.keyQueue.splice(0, 1)[0];
+        self.processKey(key, processKeyQueue);
+      }
     }
-  });
+    document.documentElement.addEventListener('keydown', function(event) {
+      if (!sfig_.keysEnabled) return;
+      var key = sfig_.eventToKey(event);
+      self.keyQueue.push(key);
+      processKeyQueue(function() {});
+    }, false);
+  }
 
-  registerKey('Render all slides, caching results', ['shift-r'], function(prez, callback) {
-    sfig_.performOperation('renderAll', function(modifiedCallback) {
-      prez.goThroughAllSlides(modifiedCallback);
-    }, callback);
-  });
-
-  registerKey('Show help', ['shift-/'], function(prez, callback) {
-    // TODO: make this less ugly
-    var lines = keyBindings.map(function(binding) {
+  Presentation.prototype.getHelpString = function() {
+    var lines = this.keyBindings.map(function(binding) {
       return '  ' + binding.description + ' [' + binding.keys.join(' ') + ']';
     });
-    alert('Key bindings:\n' + lines.join('\n'));
-  });
+    return 'Key bindings:\n' + lines.join('\n');
+  }
 
-  Presentation.prototype.processKey = function(key, callback) {
+  Presentation.prototype.readyForSlideShowKey = function() {
+    if (sfig_.urlParams.mode == 'print' || sfig_.urlParams.mode == 'outline')
+      return false;
+
     // This function is sometimes called when rendering isn't completed yet, so just ignore.
     if (this.slides[this.currSlideIndex].elem == null) {
-      console.log('Dropped '+key+' because current slide not rendered yet');
-      return;
+      console.log('Dropped key because current slide not rendered yet');
+      return false;
     }
+    return true;
+  }
 
-    if (!keyMap[key]) {
+  Presentation.prototype.processKey = function(key, callback) {
+    if (!this.keyMap[key]) {
       callback();
       return;
     } else {
-      keyMap[key].func(this, callback);
+      this.keyMap[key].func(callback);
     }
   }
 
@@ -2626,27 +2699,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // Create new container and add it to the body if doesn't exist
     if (container == null) {
-      document.body.style.overflow = 'hidden';  // Don't show scrollbars (important for fullscreen mode)
+      //document.body.style.overflow = 'hidden';  // Don't show scrollbars (important for fullscreen mode)
       container = document.body;
     }
     this.container = container;
-
-    // Set up key bindings
-    var keyQueue = [];
-    function processKeyQueue() {
-      if (keyQueue.length == 0) {
-        return;
-      } else {
-        var key = keyQueue.splice(0, 1)[0];
-        self.processKey(key, processKeyQueue);
-      }
-    }
-    document.documentElement.addEventListener('keydown', function(event) {
-      if (!sfig_.keysEnabled) return;
-      var key = sfig_.eventToKey(event);
-      keyQueue.push(key);
-      processKeyQueue(function() {});
-    }, false);
 
     self.currSlideIndex = null;
     self.currLevel = null;
@@ -2740,7 +2796,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig.figure = function(block, container) {
     if (typeof(container) == 'string') container = document.getElementById(container);
     var prez = sfig.presentation();
-    prez.addSlide(sfig.home(block));
+    prez.addSlide(block);
     prez.displayPrinterFriendly(container);
   }
 })();
