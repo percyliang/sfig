@@ -18,6 +18,11 @@ sfig.enableAnimations = true;  // Whether to allow animations.
 sfig.enableTiming = false;  // Enable to see how long it takes to render.
 sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
+Image.useCachedImages = false;  // Whether to used cached images
+
+sfig.defaultPrintNumRowsPerPage = 3;
+sfig.defaultPrintNumColsPerPage = 2;
+
 ////////////////////////////////////////////////////////////
 // Simple functions
 
@@ -765,6 +770,15 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   // Return the point of where a ray from the center leaving with given angle would intersect
   // the boundaries.  By default, assume rectangular boundaries.
   Block.prototype.clipPoint = function(angle) {
+    // If there is a unique non-orphaned child, then delegate to that
+    var c;
+    for (var i = 0; i < this.children.length; i++) {
+      if (this.children[i].orphan().get()) continue;
+      if (c == null) c = i;
+      else { c = null; break; }
+    }
+    if (c != null) return this.children[c].clipPoint(angle);
+
     this.ensureRendered();
     var dx = sfig_.cosDegrees(angle);
     var dy = sfig_.sinDegrees(angle);
@@ -1253,6 +1267,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     div.style.fontSize = this.fontSize().getOrDie();
     var content = this.content().getOrDie();
     if (this.bulleted().get()) {
+      if (typeof(content) == 'string') content = [null, content];
       content = bulletize(content);
     }
     div.innerHTML = content;
@@ -1488,6 +1503,24 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addPairProperty(Image, 'dim', 'width', 'height', null, null, 'Dimensions of rectangle');
 
   sfig.image = function(href) { return new Image().href(href); }
+
+  sfig_.cachedCommands = ['mkdir -p cached-images'];
+  sfig.cachedImage = function(href) {
+    var tokens = href.split('/');
+    var local = 'cached-images/'+tokens[tokens.length-1];
+
+    if (sfig.useCachedImages) {
+      // Use the local version
+      return new image(local).tooltip(href);
+    } else {
+      // Use web version, but suggest caching
+      sfig_.cachedCommands.push('wget \''+href+'\' -O '+local);
+      return new image(href).tooltip(href);
+    }
+  }
+  sfig.showCachedCommands = function() {
+    console.log(sfig_.cachedCommands.join('\n'));
+  }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1534,7 +1567,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   ArrowHead.prototype.createChildren = function() {
     var width = this.width().getOrElse(sfig.defaultArrowWidth);
     var length = this.length().getOrElse(sfig.defaultArrowLength);
-    var poly = sfig.polygon([0,0], [-length, -width/2], [-length, +width/2]);
+    var e = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Adjust for stroke size
+    sfig.L(e, length);
+    var poly = sfig.polygon([-e,0], [-length-e, -width/2], [-length-e, +width/2]);
     poly.rotate(this.angle());
     poly.shift(this.xtip(), this.ytip());
     this.addChild(poly);
@@ -1580,7 +1615,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     // Compute default angle from start to end (straight)
     var straightAngle = sfig_.atan2Degrees(y2 - y1, x2 - x1);
     var angle1 = this.angle1().getOrElse(straightAngle);
-    var angle2 = this.angle2().getOrElse(straightAngle);
+    var angle2 = this.angle2().getOrElse(straightAngle + 180);
 
     // Clip with object if necessary
     if (this.b1().get() != null) {
@@ -1588,18 +1623,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       x1 = p1[0], y1 = p1[1];
     }
     if (this.b2().get() != null) {
-      var p2 = this.b2().get().clipPoint(angle2+180);
+      var p2 = this.b2().get().clipPoint(angle2);
       x2 = p2[0], y2 = p2[1];
     }
-
-    // Draw line
-    elem.setAttribute('x1', x1);
-    elem.setAttribute('y1', y1);
-    elem.setAttribute('x2', x2);
-    elem.setAttribute('y2', y2);
-
-    // TODO: set angles
-    // TODO: curved lines
 
     // Save our rendered values
     this.realAngle1(angle1);
@@ -1608,6 +1634,27 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     this.realy1(y1);
     this.realx2(x2);
     this.realy2(y2);
+
+    // TODO: set angles
+    // TODO: curved lines
+
+    // Apply shrink - note doesn't affect the real coordinates
+    var shrink1 = this.shrink1().get();
+    if (shrink1 != null) {
+      x1 += shrink1 * sfig_.cosDegrees(angle1);
+      y1 += shrink1 * sfig_.sinDegrees(angle1);
+    }
+    var shrink2 = this.shrink2().get();
+    if (shrink2 != null) {
+      x2 += shrink2 * sfig_.cosDegrees(angle2);
+      y2 += shrink2 * sfig_.sinDegrees(angle2);
+    }
+
+    // Draw line
+    elem.setAttribute('x1', x1);
+    elem.setAttribute('y1', y1);
+    elem.setAttribute('x2', x2);
+    elem.setAttribute('y2', y2);
 
     this.elem = elem;
     callback();
@@ -1618,6 +1665,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addPairProperty(Line, 'p2', 'x2', 'y2', null, null, 'Ending point');
   sfig_.addProperty(Line, 'b1', null, 'Starting block');
   sfig_.addProperty(Line, 'b2', null, 'Ending block');
+  sfig_.addPairProperty(Line, 'shrink', 'shrink1', 'shrink2', null, null, 'Shink length of line by this amount');
   sfig_.addProperty(Line, 'angle1', null, 'Starting angle');
   sfig_.addProperty(Line, 'angle2', null, 'Ending angle');
   // TODO: stroke-linecap
@@ -1655,19 +1703,30 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.inheritsFrom('DecoratedLine', DecoratedLine, sfig.Block);
 
   DecoratedLine.prototype.createChildren = function() {
-    this.addChild(this.line);
     if (this.drawArrow1().get()) {
       this.arrowHead1 = new sfig.ArrowHead();
       this.arrowHead1.setEnd(this);
-      this.addChild(this.arrowHead1);
-      this.arrowHead1.tip(this.line.realx1(), this.line.realy1()).angle(this.line.realAngle1().add(180)).color(this.line.strokeColor().orElse(sfig.defaultStrokeColor));
+      this.arrowHead1.tip(this.line.realx1(), this.line.realy1());
+      this.arrowHead1.angle(this.line.realAngle1().add(180));
+      // Need to explicitly set the color and width
+      this.arrowHead1.color(this.strokeColor().getOrElse(sfig.defaultStrokeColor));
+      this.arrowHead1.strokeWidth(this.strokeWidth().getOrElse(sfig.defaultStrokeWidth));
+      this.line.shrink1(this.arrowHead1.length().getOrDie() + this.arrowHead1.strokeWidth().getOrDie() * 1.5);
     }
     if (this.drawArrow2().get()) {
       this.arrowHead2 = new sfig.ArrowHead();
       this.arrowHead2.setEnd(this);
-      this.addChild(this.arrowHead2);
-      this.arrowHead2.tip(this.line.realx2(), this.line.realy2()).angle(this.line.realAngle2()).color(this.line.strokeColor().orElse(sfig.defaultStrokeColor));
+      this.arrowHead2.tip(this.line.realx2(), this.line.realy2());
+      this.arrowHead2.angle(this.line.realAngle2().add(180));
+      // Need to explicitly set the color and width
+      this.arrowHead2.color(this.strokeColor().getOrElse(sfig.defaultStrokeColor));
+      this.arrowHead2.strokeWidth(this.strokeWidth().getOrElse(sfig.defaultStrokeWidth));
+      this.line.shrink2(this.arrowHead2.length().getOrDie() + this.arrowHead2.strokeWidth().getOrDie() * 1.5);
     }
+
+    this.addChild(this.line);
+    if (this.arrowHead1 != null) this.addChild(this.arrowHead1);
+    if (this.arrowHead2 != null) this.addChild(this.arrowHead2);
   };
 
   sfig_.addPairProperty(DecoratedLine, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Whether to draw an arrow at the two ends of the line');
@@ -1756,14 +1815,15 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Wrap.prototype.createChildren = function() {
     var content = this.content();
-    if (content.exists()) this.addChild(sfig.std(content.get()));
+    if (content.exists()) {
+      content = sfig.std(content.get());
+      this.addChild(content);
+      this.orphan(content.orphan());
+    }
   }
 
   Wrap.prototype.resetContent = function(content) {
     this.content(content);
-    var root = this.getRoot();
-    root.resetRender();
-    root.freeze();
   }
 
   sfig_.addProperty(Wrap, 'content', null, 'What to draw');
@@ -1788,6 +1848,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.inheritsFrom('Transform', Transform, sfig.Block);
 
   Transform.prototype.createChildren = function() {
+    this.orphan(this.content.orphan());
+
     var wrapped = sfig.wrap(this.content);
 
     // Shift so that the pivot point is at (0,0)
@@ -1808,8 +1870,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     // Resize so that width and height are as desired
     var xscale = this.width().andThen(this.width().div(this.content.realWidth()));
     var yscale = this.height().andThen(this.height().div(this.content.realHeight()));
-    var scale = xscale.min(yscale);
-    wrapped.scale(scale);
+    wrapped.scale(xscale.min(yscale));  // Preserve aspect ratio
     //wrapped.scale(xscale.orElse(yscale), yscale.orElse(xscale));
 
     this.addChild(wrapped);
@@ -2022,6 +2083,12 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       throw 'Invalid justify (expected l,c,r): '+justify;
     }
 
+    // To compute the bounding box (if there are orphan children)
+    var minx = totalWidth;
+    var miny = totalHeight;
+    var maxx = 0;
+    var maxy = 0;
+
     // Display the table
     this.elem = sfig_.newSvgElem('g');
     for (var r = 0; r < this.numRows; r++) {
@@ -2036,6 +2103,14 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         var yoffset = (ystart[r] + 0.5 * (ypivot + 1) * heights[r]) -
                       (cell.top().getOrDie() + 0.5 * (ypivot + 1) * cell.realHeight().getOrDie());
 
+        // Only non-orphans contribute to the bounding box
+        if (!cell.orphan().get()) {
+          minx = Math.min(minx, xstart[c]);
+          miny = Math.min(miny, ystart[r]);
+          maxx = Math.max(maxx, xstart[c+1]);
+          maxy = Math.max(maxy, ystart[r+1]);
+        }
+
         // Shift the cell element
         this.elem.appendChild(sfig_.translateElem(cell.elem, xoffset, yoffset));
 
@@ -2045,7 +2120,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     }
 
     // Manually set bounding box.
-    this.left(0).top(0).realWidth(totalWidth).realHeight(totalHeight);
+    this.left(minx).top(miny).realWidth(maxx-minx).realHeight(maxy-miny);
     this.bboxIsSet = true;
 
     callback();
@@ -2149,7 +2224,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
   sfig_.addProperty(Slide, 'id', null, 'Identifier of the slide');
 
   sfig_.addProperty(Slide, 'comments', null, 'Identifier of the slide');
-  sfig_.addProperty(Slide, 'showHelp', true, 'Whether to show help');
+  sfig_.addProperty(Slide, 'showHelp', false, 'Whether to show help');
   sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices');
 
   sfig.slide = function() {
@@ -2190,7 +2265,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         if (comments instanceof Array) comments = comments.join('\n');
         items.push(text('[Comments]').tooltip(comments));
       }
-      items.push(sfig.text('[Help]').tooltip(this.getHelpString()));
+      if (slide.showHelp().get())
+        items.push(sfig.text('[Help]').tooltip(this.getHelpString()));
       slide.rightHeader(sfig.table(items).xmargin(5));
     }
 
@@ -2305,6 +2381,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
       if (query == null) return callback();
       var slideIndex = self.currSlideIndex;
+      var isTextSearch = query[0] == '/' || query[0] == '?';
       var incr = query[0] == '?' ? -1 : +1;
       var found = false;
       while (true) {
@@ -2313,7 +2390,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         var slide = self.slides[slideIndex];
         if ((slide.id && slide.id().get() == query) ||
             (''+slideIndex == query) ||
-            ((query[0] == '/' || query[0] == '?') && containsText(slide, query.slice(1)))) {
+            (isTextSearch && containsText(slide, query.slice(1)))) {
           found = true;
           break;
         }
@@ -2322,7 +2399,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
       if (!found) return callback();
 
       self.setSlideIndex(slideIndex, function() {
-        self.setLevel(0);
+        self.setLevel(isTextSearch ? sfig_.maxLevel : 0);
         self.updateUrlParams();
         callback();
       });
@@ -2416,10 +2493,12 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     // Render all the slides
     var self = this;
     var i = 0;
+    var saveSlideIndex = self.currSlideIndex;
+    var saveLevel = self.currLevel;
     function process() {
       console.log('Rendering slide '+i+'/'+self.slides.length);
       if (i == self.slides.length) {
-        self.setSlideIndexAndLevel(0, 0, callback);  // Go to beginning
+        self.setSlideIndexAndLevel(saveSlideIndex, saveLevel, callback);  // Go to beginning
         self.updateUrlParams();
         return;
       }
@@ -2441,6 +2520,8 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (slide == null) throw 'Invalid slide index: '+self.currSlideIndex;
     self.container.appendChild(self.slides[self.currSlideIndex].state.svg);
 
+    if (sfig_.urlParams.mode == 'fullScreen') slide.borderWidth(0);
+
     var state = slide.state;
 
     // Reset nodes
@@ -2458,11 +2539,17 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
       var desiredWidth, desiredHeight;
       if (sfig_.urlParams.mode == 'fullScreen') {  // Print to fit the screen
-        var scale = 0.98;
+        // Make this less than 1, otherwise Firefox will show scrollbars
+        var scale = 0.97;
         desiredWidth = screen.availWidth * scale;
         desiredHeight = screen.availHeight * scale;
       } else if (sfig_.urlParams.mode == 'print') {  // Print to fit the paper
-        var scale = 0.7;
+        var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
+        var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
+        var scale;
+        if (numColsPerPage == 1) scale = 0.7;
+        else if (numColsPerPage == 2) scale = 0.4;
+        else scale = 1;
         desiredWidth = width * scale;
         desiredHeight = height * scale;
       } else {  // Original size
@@ -2668,7 +2755,9 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
     if (container == null) container = document.body;
     this.container = container;
 
-    var numSlidesPerPage = sfig_.urlParams.numSlidesPerPage || 2;
+    var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
+    var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
+    var numSlidesPerPage = numRowsPerPage * numColsPerPage;
     var i = 0;
     function process() {
       //console.log('Printing slide '+i+'/'+self.slides.length);
@@ -2682,8 +2771,10 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
         if (i < self.slides.length) {
           if (i % numSlidesPerPage == 0) {
             self.container.appendChild(pageBreak());
-          } else {
+          } else if (i % numColsPerPage == 0) {
             self.container.appendChild(interSlidePadding());
+          } else {
+            self.container.appendChild(document.createTextNode(' '));
           }
         }
         process();
@@ -2701,7 +2792,7 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
     // Create new container and add it to the body if doesn't exist
     if (container == null) {
-      //document.body.style.overflow = 'hidden';  // Don't show scrollbars (important for fullscreen mode)
+      //document.body.style.overflow = 'hidden'; // Don't show scrollbars
       container = document.body;
     }
     this.container = container;
@@ -2714,6 +2805,12 @@ sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 
   Presentation.prototype.refresh = function(callback) {
     if (callback == null) callback = function() {};
+
+    // Force reload
+    var slide = this.slides[this.currSlideIndex];
+    slide.resetRender();
+    slide.freeze();
+
     this.setSlideIndexAndLevel(this.currSlideIndex, this.currLevel, callback);
   }
 
