@@ -9,3 +9,6 @@ wget --no-check-certificate -c http://github.com/mathjax/MathJax/zipball/v2.0-la
 # d3: for visualization
 wget --no-check-certificate -c http://d3js.org/d3.v2.min.js -O external/d3.v2.min.js
 wget --no-check-certificate -c http://d3js.org/d3.v2.js -O external/d3.v2.js
+
+# seedrandom: for generating reproducing random numbers
+wget --no-check-certificate -c http://davidbau.com/encode/seedrandom.js -O external/seedrandom.js

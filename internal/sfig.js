@@ -1568,7 +1568,6 @@ sfig.defaultPrintNumColsPerPage = 2;
     var width = this.width().getOrElse(sfig.defaultArrowWidth);
     var length = this.length().getOrElse(sfig.defaultArrowLength);
     var e = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Adjust for stroke size
-    sfig.L(e, length);
     var poly = sfig.polygon([-e,0], [-length-e, -width/2], [-length-e, +width/2]);
     poly.rotate(this.angle());
     poly.shift(this.xtip(), this.ytip());
@@ -1650,6 +1649,19 @@ sfig.defaultPrintNumColsPerPage = 2;
       y2 += shrink2 * sfig_.sinDegrees(angle2);
     }
 
+    // Compute label position (on the shrunk versions)
+    // Label is always in a negative y direction
+    var x = (x1 + x2) / 2;
+    var y = (y1 + y2) / 2;
+    var labelDist = this.labelDist().getOrDie();
+    var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+    var dx = -(y2-y1) / len;
+    var dy = +(x2-x1) / len;
+    if (dy > 0) { dx = -dx; dy = -dy;}
+    x += labelDist * dx;
+    y += labelDist * dy;
+    this.plabel(x, y);
+
     // Draw line
     elem.setAttribute('x1', x1);
     elem.setAttribute('y1', y1);
@@ -1675,6 +1687,10 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addPairProperty(Line, 'realp2', 'realx2', 'realy2', null, null, 'Rendered ending point');
   sfig_.addProperty(Line, 'realAngle1', null, 'Rendered starting angle');
   sfig_.addProperty(Line, 'realAngle2', null, 'Rendered ending angle');
+
+  // For label positioning (label drawing is done elsewhere
+  sfig_.addProperty(Line, 'labelDist', 5, 'How far to put the label');
+  sfig_.addPairProperty(Line, 'plabel', 'xlabel', 'ylabel', null, null, 'After rendering, where to put the center of the label');
 
   Line.prototype.arg1 = function(arg1) {
     if (arg1 instanceof Array) this.p1(arg1[0], arg1[1]);
@@ -1709,7 +1725,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       this.arrowHead1.tip(this.line.realx1(), this.line.realy1());
       this.arrowHead1.angle(this.line.realAngle1().add(180));
       // Need to explicitly set the color and width
-      this.arrowHead1.color(this.strokeColor().getOrElse(sfig.defaultStrokeColor));
+      this.arrowHead1.color(this.line.strokeColor().getOrElse(sfig.defaultStrokeColor));
       this.arrowHead1.strokeWidth(this.strokeWidth().getOrElse(sfig.defaultStrokeWidth));
       this.line.shrink1(this.arrowHead1.length().getOrDie() + this.arrowHead1.strokeWidth().getOrDie() * 1.5);
     }
@@ -1719,7 +1735,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       this.arrowHead2.tip(this.line.realx2(), this.line.realy2());
       this.arrowHead2.angle(this.line.realAngle2().add(180));
       // Need to explicitly set the color and width
-      this.arrowHead2.color(this.strokeColor().getOrElse(sfig.defaultStrokeColor));
+      this.arrowHead2.color(this.line.strokeColor().getOrElse(sfig.defaultStrokeColor));
       this.arrowHead2.strokeWidth(this.strokeWidth().getOrElse(sfig.defaultStrokeWidth));
       this.line.shrink2(this.arrowHead2.length().getOrDie() + this.arrowHead2.strokeWidth().getOrDie() * 1.5);
     }
@@ -1727,9 +1743,15 @@ sfig.defaultPrintNumColsPerPage = 2;
     this.addChild(this.line);
     if (this.arrowHead1 != null) this.addChild(this.arrowHead1);
     if (this.arrowHead2 != null) this.addChild(this.arrowHead2);
+
+    // Add label
+    var label = this.label().get();
+    if (label != null)
+      this.addChild(center(label).shift(this.line.xlabel(), this.line.ylabel()));
   };
 
   sfig_.addPairProperty(DecoratedLine, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Whether to draw an arrow at the two ends of the line');
+  sfig_.addProperty(DecoratedLine, 'label', null, 'Label to draw');
 
   sfig.decoratedLine = function(arg1, arg2) { return new DecoratedLine().line.arg1(arg1).arg2(arg2).end; }
   sfig.arrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2).drawArrow(false, true); }
