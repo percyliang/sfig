@@ -2928,8 +2928,14 @@ sfig.defaultPrintNumColsPerPage = 2;
       var script = sfig_.includeScript(parentDir + '/../external/MathJax/MathJax.js?config=default');
       var buf = '';
       buf += 'MathJax.Hub.Config({';
-      // TODO: want to remove this, but Chrome doesn't work without it.
-      if (window.chrome) buf += '  jax: ["input/TeX", "output/SVG"],';
+      // TODO: want to remove this condition and not use the SVG jax, but there are problems.
+      // Chrome:
+      //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
+      //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
+      // Firefox:
+      //   - normal: works great, except when we print from this, the text is completely mis-aligned.
+      //   - jax=SVG: only needed for printing.
+      if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
       buf += '  extensions: ["tex2jax.js"],';
       buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
       buf += '  TeX: { Macros: {';
