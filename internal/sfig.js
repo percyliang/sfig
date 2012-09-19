@@ -2280,7 +2280,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (pivot == null) throw 'Missing pivot';
 
     button = sfig.frame(button).bg.strokeWidth(options.borderWidth || 1).end.padding(5);
-    explanation = frame(explanation).bg.fillColor('white').strokeWidth(1).end.padding(5).showLevel(-1);
+    explanation = frame(explanation).bg.fillColor('white').strokeWidth(1).end.padding(5);
     var x, y;
     if (pivot[0] == -1) x = button.left();
     else if (pivot[0] == 1) x = button.right();
@@ -2288,7 +2288,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (pivot[1] == -1) y = button.bottom();
     else if (pivot[1] == 1) y = button.top();
     else y = button.ymiddle();
-    explanation = transform(explanation).pivot(pivot[0], pivot[1]).shift(x, y).orphan(true);
+    explanation = transform(explanation).pivot(pivot[0], pivot[1]).shift(x, y).orphan(true).showLevel(-1);
 
     button.setPointerWhenMouseOver().onClick(function() {
       if (explanation.toggleShowHide())
