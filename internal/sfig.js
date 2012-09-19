@@ -7,6 +7,7 @@ var sfig_ = {}; // Namespace of private members.
 ////////////////////////////////////////////////////////////
 // Default parameters which can be overridden.
 
+sfig.homePage = 'http://github.com/percyliang/sfig';
 sfig.version = '1.0';
 sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
@@ -988,6 +989,18 @@ sfig.defaultPrintNumColsPerPage = 2;
     this.elem.style.display = 'none';
     if (reverse && this.replace().get() != null) this.replace().get().show(reverse);
   }
+  Block.prototype.toggleShowHide = function(reverse) {
+    // Recursively set the display to whatever is opposite of what the top level is.
+    // Return whether it's shown
+    var target = this.elem.style.display == 'none' ? null : 'none';
+    function recurse(elem) {
+      if (elem.style) elem.style.display = target;
+      for (var i = 0; i < elem.childElementCount; i++)
+        recurse(elem.childNodes[i]);
+    }
+    recurse(this.elem);
+    return target == null;
+  }
 
   Block.prototype.startAnimate = function() {
     // TODO: Animating Text (which is a foreignObject) in Firefox doesn't work (but works in Chrome)
@@ -1511,11 +1524,11 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     if (sfig.useCachedImages) {
       // Use the local version
-      return new image(local).tooltip(href);
+      return new image(local);
     } else {
       // Use web version, but suggest caching
       sfig_.cachedCommands.push('wget \''+href+'\' -O '+local);
-      return new image(href).tooltip(href);
+      return new image(href);
     }
   }
   sfig.showCachedCommands = function() {
@@ -1793,7 +1806,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
   sfig.xline = function(length) { return sfig.polyline([0, 0], [length, 0]); }
   sfig.yline = function(length) { return sfig.polyline([0, 0], [0, length]); }
-  
+
   sfig.xspace = function(length) { return sfig.xline(length).color(sfig.defaultBgColor); }
   sfig.yspace = function(length) { return sfig.yline(length).color(sfig.defaultBgColor); }
 })();
@@ -1840,7 +1853,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (content.exists()) {
       content = sfig.std(content.get());
       this.addChild(content);
-      this.orphan(content.orphan());
+      if (!this.orphan().exists()) this.orphan(content.orphan());
     }
   }
 
@@ -1870,7 +1883,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.inheritsFrom('Transform', Transform, sfig.Block);
 
   Transform.prototype.createChildren = function() {
-    this.orphan(this.content.orphan());
+    if (!this.orphan().exists()) this.orphan(this.content.orphan());
 
     var wrapped = sfig.wrap(this.content);
 
@@ -2163,10 +2176,9 @@ sfig.defaultPrintNumColsPerPage = 2;
 // Slide
 
 (function() {
-  var Slide = sfig.Slide = function(contents, extra) {
+  var Slide = sfig.Slide = function(contents) {
     Slide.prototype.constructor.call(this);
     this.contents = contents;
-    this.extra = extra;
 
     this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
     this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
@@ -2205,14 +2217,16 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     this.addChild(border);
 
-    // Add headers and footers
-    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale()));
-    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shift(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()));
-    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()));
-    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()));
-
     this.addChild(titleBody);
-    if (this.extra != null) this.addChild(this.extra);
+
+    // Add headers and footers
+    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shift(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+
+    var extra = this.extra().get();
+    if (extra != null) this.addChild(sfig.std(extra));
   };
 
   sfig_.addProperty(Slide, 'title', null, 'Title string to show at top of slide.');
@@ -2245,9 +2259,10 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   sfig_.addProperty(Slide, 'id', null, 'Identifier of the slide');
 
-  sfig_.addProperty(Slide, 'comments', null, 'Identifier of the slide');
+  sfig_.addProperty(Slide, 'notes', null, 'Identifier of the slide');
   sfig_.addProperty(Slide, 'showHelp', false, 'Whether to show help');
   sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices');
+  sfig_.addProperty(Slide, 'extra', null, 'Object to overlay on top of the slide');
 
   sfig.slide = function() {
     var title = arguments[0];
@@ -2256,6 +2271,32 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (title != null) slide.title(title);
     else slide.titleHeight(0).titleSpacing(0);  // No title - plain slide
     return slide;
+  }
+
+  // Return an element which looks like |button|, but when pressed will toggle display of |explanation| under it.
+  sfig.explain = function(button, explanation, options) {
+    if (options == null) options = {};
+    var pivot = options.pivot;
+    if (pivot == null) throw 'Missing pivot';
+
+    button = sfig.frame(button).bg.strokeWidth(options.borderWidth || 1).end.padding(5);
+    explanation = frame(explanation).bg.fillColor('white').strokeWidth(1).end.padding(5).showLevel(-1);
+    var x, y;
+    if (pivot[0] == -1) x = button.left();
+    else if (pivot[0] == 1) x = button.right();
+    else x = button.xmiddle();
+    if (pivot[1] == -1) y = button.bottom();
+    else if (pivot[1] == 1) y = button.top();
+    else y = button.ymiddle();
+    explanation = transform(explanation).pivot(pivot[0], pivot[1]).shift(x, y).orphan(true);
+
+    button.setPointerWhenMouseOver().onClick(function() {
+      if (explanation.toggleShowHide())
+        button.bg.elem.style.fill = 'gray';
+      else
+        button.bg.elem.style.fill = 'none';
+    });
+    return sfig.overlay(button, explanation);
   }
 
   // Set default text width based on slide width
@@ -2280,16 +2321,18 @@ sfig.defaultPrintNumColsPerPage = 2;
       // Add slide index
       if (slide.showIndex().get()) slide.rightFooter(this.slides.length)
 
-      // Add comments and help
+      // Add notes and help
       var items = [];
-      if (slide.comments().exists()) {
-        var comments = slide.comments().get();
-        if (comments instanceof Array) comments = comments.join('\n');
-        items.push(text('[Comments]').tooltip(comments));
+      var notes = slide.notes().get();
+      if (notes) {
+        items.push(sfig.explain('Notes', std(notes).scale(1.5), {pivot: [1, -1]}));
       }
       if (slide.showHelp().get())
-        items.push(sfig.text('[Help]').tooltip(this.getHelpString()));
-      slide.rightHeader(sfig.table(items).xmargin(5));
+        items.push(sfig.explain('Help', this.getHelpBlock().scale(1.5), {pivot: [1, -1]}));
+      if (slide.rightHeader().exists())
+        items.push(slide.rightHeader().get());
+      if (items.length > 0)
+        slide.rightHeader(sfig.table(items).xmargin(5));
     }
 
     // The root is shown at level 0
@@ -2384,24 +2427,27 @@ sfig.defaultPrintNumColsPerPage = 2;
       self.showPrevSlide(false, callback);
     });
 
-    this.registerKey('Jump to presentation', ['shift-g'], function(callback) {
+    this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
       var query = prompt('Go to which presentation (name)?');
       if (query == null) return callback();
       sfig_.goToPresentation(query, null, null, false);
     });
 
     function containsText(block, query) {
-      if (block instanceof sfig.Text)
-        return (block.content().get() || '').toString().match(query);
+      if (block instanceof sfig.Text) {
+        var content = (block.content().get() || '').toString();
+        return content.toLowerCase().match(query.toLowerCase());
+      }
       for (var i = 0; i < block.children.length; i++)
         if (containsText(block.children[i], query)) return true;
       return false;
     }
 
-    this.registerKey('Jump to slide', ['g'], function(callback) {
+    this.registerKey('Jump to slide (by number or search)', ['g'], function(callback) {
       if (!self.readyForSlideShowKey()) return callback();
       var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
       if (query == null) return callback();
+      if (parseInt(query) < 0) query = self.slides.length + parseInt(query);
       var slideIndex = self.currSlideIndex;
       var isTextSearch = query[0] == '/' || query[0] == '?';
       var incr = query[0] == '?' ? -1 : +1;
@@ -2483,11 +2529,15 @@ sfig.defaultPrintNumColsPerPage = 2;
     }, false);
   }
 
-  Presentation.prototype.getHelpString = function() {
-    var lines = this.keyBindings.map(function(binding) {
-      return '  ' + binding.description + ' [' + binding.keys.join(' ') + ']';
+  Presentation.prototype.getHelpBlock = function() {
+    var rows = this.keyBindings.map(function(binding) {
+      return [binding.keys.map(function(key) { return key.fontcolor('blue') }).join(' | '.fontcolor('brown')), binding.description];
     });
-    return 'Key bindings:\n' + lines.join('\n');
+    return sfig.ytable(
+      'This presentation is created using <a href="'+sfig.homePage+'" target="blank">sfig '+sfig.version+'</a>.',
+      'Key bindings'.bold(),
+      new sfig.Table(rows).xjustify('rl').xmargin(15),
+    _).center().ymargin(10);
   }
 
   Presentation.prototype.readyForSlideShowKey = function() {
