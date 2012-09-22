@@ -1604,8 +1604,6 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.inheritsFrom('Line', Line, sfig.Block);
 
   Line.prototype.renderElem = function(state, callback) {
-    var elem = sfig_.newSvgElem('line');
-
     // Get positions
     var x1, y1, x2, y2;
     if (this.b1().get() != null) {
@@ -1639,16 +1637,13 @@ sfig.defaultPrintNumColsPerPage = 2;
       x2 = p2[0], y2 = p2[1];
     }
 
-    // Save our rendered values
+    // Save our rendered values (note: before shrinking)
     this.realAngle1(angle1);
     this.realAngle2(angle2);
     this.realx1(x1);
     this.realy1(y1);
     this.realx2(x2);
     this.realy2(y2);
-
-    // TODO: set angles
-    // TODO: curved lines
 
     // Apply shrink - note doesn't affect the real coordinates
     var shrink1 = this.shrink1().get();
@@ -1662,26 +1657,51 @@ sfig.defaultPrintNumColsPerPage = 2;
       y2 += shrink2 * sfig_.sinDegrees(angle2);
     }
 
-    // Compute label position (on the shrunk versions)
-    // Label is always in a negative y direction
-    var x = (x1 + x2) / 2;
-    var y = (y1 + y2) / 2;
+    // Compute label position (note: on the shrunk coordinates)
+    // alwaysUp: label is always in a negative y direction
+    // frac: what fraction of the way from p1 to p2
+    // soar: how much to go above the line at |frac|
+    function getPoint(frac, soar, alwaysUp) {
+      var x = frac * x1 + (1-frac) * x2;
+      var y = (y1 + y2) / 2;
+      var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+      var dx = -(y2-y1) / len;
+      var dy = +(x2-x1) / len;
+      if (alwaysUp && dy > 0) { dx = -dx; dy = -dy;}
+      x += soar * dx;
+      y += soar * dy;
+      return {x: x, y: y};
+    }
+
+    // Place label
     var labelDist = this.labelDist().getOrDie();
-    var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
-    var dx = -(y2-y1) / len;
-    var dy = +(x2-x1) / len;
-    if (dy > 0) { dx = -dx; dy = -dy;}
-    x += labelDist * dx;
-    y += labelDist * dy;
-    this.plabel(x, y);
+    var labelpt = getPoint(0.5, labelDist, true);
+    this.plabel(labelpt.x, labelpt.y);
 
     // Draw line
-    elem.setAttribute('x1', x1);
-    elem.setAttribute('y1', y1);
-    elem.setAttribute('x2', x2);
-    elem.setAttribute('y2', y2);
+    var ctrlx1 = this.ctrlx1().get();
+    var ctrly1 = this.ctrly1().get();
+    var curve = this.curve().get();
+    if (curve) {
+      var ctrlpt = getPoint(0.5, curve, false);
+      ctrlx1 = ctrlpt.x;
+      ctrly1 = ctrlpt.y;
+    }
+    //sfig.L(curve, ctrlx1, ctrly1);
 
-    this.elem = elem;
+    if (ctrlx1 != null) {
+      this.elem = sfig_.newSvgElem('path');
+      var spec = 'M'+x1+','+y1+' '+'Q'+ctrlx1+','+ctrly1+' '+x2+','+y2;
+      //sfig.L(spec);
+      this.elem.setAttribute('d', spec);
+    } else {
+      this.elem = sfig_.newSvgElem('line');
+      this.elem.setAttribute('x1', x1);
+      this.elem.setAttribute('y1', y1);
+      this.elem.setAttribute('x2', x2);
+      this.elem.setAttribute('y2', y2);
+    }
+
     callback();
   }
 
@@ -1693,7 +1713,9 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addPairProperty(Line, 'shrink', 'shrink1', 'shrink2', null, null, 'Shink length of line by this amount');
   sfig_.addProperty(Line, 'angle1', null, 'Starting angle');
   sfig_.addProperty(Line, 'angle2', null, 'Ending angle');
-  // TODO: stroke-linecap
+  sfig_.addProperty(Line, 'curve', null, 'Distance to curve the line (specifies a quadratic Bezier curve)');
+  sfig_.addPairProperty(Line, 'ctrlp1', 'ctrlx1', 'ctrly1', null, null, 'First control point');
+  sfig_.addPairProperty(Line, 'ctrlp2', 'ctrlx2', 'ctrly2', null, null, 'Second control point');
 
   // Rendered versions
   sfig_.addPairProperty(Line, 'realp1', 'realx1', 'realy1', null, null, 'Rendered starting point');
