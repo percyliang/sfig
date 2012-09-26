@@ -96,8 +96,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     });
   }
 
-  sfig.level = function(n) {
-    return new sfig.PropertyChanger('level('+n+')', function(env) {
+  sfig.showLevel = function(n) {
+    return new sfig.PropertyChanger('showLevel('+n+')', function(env) {
       env.showLevel = n;
     });
   }
@@ -143,6 +143,11 @@ sfig.defaultPrintNumColsPerPage = 2;
       xmlns: sfig_.svgns,
       version: '1.1',
     });
+  }
+
+  sfig_.mergeInto = function(target, source) {
+    for (var key in source) target[key] = source[key];
+    return target;
   }
 
   sfig_.rectToString = function(r) { return r.x+','+r.y+';'+r.width+'x'+r.height; }
@@ -1527,7 +1532,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       return new image(local);
     } else {
       // Use web version, but suggest caching
-      sfig_.cachedCommands.push('wget \''+href+'\' -O '+local);
+      sfig_.cachedCommands.push('wget -c \''+href+'\' -O '+local);
       return new image(href);
     }
   }
@@ -2641,7 +2646,7 @@ sfig.defaultPrintNumColsPerPage = 2;
         var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
         var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
         var scale;
-        if (numColsPerPage == 1) scale = 0.7;
+        if (numColsPerPage == 1) scale = numRowsPerPage == 1 ? 1 : 0.7;
         else if (numColsPerPage == 2) scale = 0.4;
         else scale = 1;
         desiredWidth = width * scale;
@@ -2978,17 +2983,20 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   sfig_.goToPresentation = function(name, slideId, level, newWindow) {
-    sfig_.urlParams.slideIndex = null;
-    sfig_.urlParams.slideId = slideId;
-    sfig_.urlParams.level = level;
+    var urlParams = newWindow ? sfig_.mergeInto({}, sfig_.urlParams) : sfig_.urlParams;
+    urlParams.slideIndex = null;
+    urlParams.slideId = slideId;
+    urlParams.level = level;
+
     // name is the filename (without the html extension) of the sfig presentation to go to.
     var pathname = window.location.pathname.replace(/\/[^\/]+\.html/, '/'+name+'.html');
-    var urlHash = sfig_.serializeUrlParams(sfig_.urlParams);
+    var urlHash = sfig_.serializeUrlParams(urlParams);
     var url = pathname + urlHash;
     if (newWindow)
       window.open(url);
-    else
+    else {
       window.location.href = url;
+    }
   }
 
   // Create a figure from |block| and render it into |container|.
