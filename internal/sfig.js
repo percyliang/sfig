@@ -1233,8 +1233,11 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   Block.prototype.linkToInternal = function(prez, slideId, level) {
-    this.onClick(function() {
-      prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
+    this.onClick(function(block, event) {
+      if (event.ctrlKey)
+        sfig_.goToPresentation(sfig_.currPresentationName(), slideId, level, true);
+      else
+        prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
     });
     return this.setPointerWhenMouseOver();
   }
@@ -1834,8 +1837,8 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig.xline = function(length) { return sfig.polyline([0, 0], [length, 0]); }
   sfig.yline = function(length) { return sfig.polyline([0, 0], [0, length]); }
 
-  sfig.xspace = function(length) { return sfig.xline(length).color(sfig.defaultBgColor); }
-  sfig.yspace = function(length) { return sfig.yline(length).color(sfig.defaultBgColor); }
+  sfig.xspace = function(length) { return sfig.xline(length).opacity(0); }
+  sfig.yspace = function(length) { return sfig.yline(length).opacity(0); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -2457,7 +2460,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
       var query = prompt('Go to which presentation (name)?');
       if (query == null) return callback();
-      sfig_.goToPresentation(query, null, null, false);
+      sfig_.goToPresentation(query, null, null, true);
     });
 
     function containsText(block, query) {
@@ -2980,6 +2983,10 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
 
     sfig_.initialized = true;
+  }
+
+  sfig_.currPresentationName = function() {
+    return window.location.pathname.match(/\/([^\/]+)\.html/)[1];
   }
 
   sfig_.goToPresentation = function(name, slideId, level, newWindow) {
