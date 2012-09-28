@@ -195,6 +195,11 @@ add(slide('Example Tools',
   timeSeriesPlotter(),
 _));
 
+add(slide('Drawing Rooted Trees',
+  'sfig can be used to draw trees (e.g., for syntax):',
+  example("T = sfig.rootedTree\nB = sfig.rootedTreeBranch\nnp = T('NP', T('N', 'I'))\nvp = T('VP', T('V', 'like'), T('N', 'cheese'))\ntree = T('S', np, vp)\ntree.recverticalCenterEdges(true)\ntree.recnodeBorderWidth(0).recnodePadding(0)"),
+_));
+
 add(slide('From Blocks to SVG elements',
   bulletedText([null,
     'All the code so far only generates Blocks, which contain all the necessary information to render into SVG.',
