@@ -186,6 +186,14 @@ sfig.defaultPrintNumColsPerPage = 2;
     return transformed;
   }
 
+  // x is either already an HTMLElement or a string which is to be parsed as such
+  sfig_.ensureHTMLElement = function(x) {
+    if (x instanceof HTMLElement) return x;
+    var div = sfig_.newElem('div');
+    div.innerHTML = x;
+    return div;
+  }
+
   var codeToKey = {
     8 : 'backspace',
     9 : 'tab',
@@ -1242,6 +1250,24 @@ sfig.defaultPrintNumColsPerPage = 2;
     return this.setPointerWhenMouseOver();
   }
 
+  // Parallel setPointerWhenMouseOver() and linkToInternal() for divs.
+  // Need these to modify the links of HTML elements which are not represented by a block.
+  sfig.divSetPointerWhenMouseOver = function(div) {
+    div.onmouseover = function() { sfig.setPointerCursor(); };
+    div.onmouseout = function() { sfig.resetCursor(); };
+    return div;
+  }
+
+  sfig.divLinkToInternal = function(div, prez, slideId, level) {
+    div.onclick = function(event) {
+      if (event.ctrlKey)
+        sfig_.goToPresentation(sfig_.currPresentationName(), slideId, level, true);
+      else
+        prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
+    };
+    return sfig.divSetPointerWhenMouseOver(div);
+  }
+
   Block.prototype.linkToExternal = function(name, slideId, level) {
     this.onClick(function() { sfig_.goToPresentation(name, slideId, level, true); });
     return this.setPointerWhenMouseOver();
@@ -1263,13 +1289,21 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   // TODO: disadvantage with building bulleted lists this way is that it must
   // be text all rendered at once (can't put pause()).
-  function bulletize(content) {
-    if (typeof(content) == 'string') return content;
-    var result = (content[0] ? content[0] : '') + '<ul style="margin:0">';
-    for (var i = 1; i < content.length; i++)
-      result += '<li>' + bulletize(content[i]) + '</li>';
-    result += '</ul>';
-    return result;
+  Text.bulletize = function(content) {
+    if (content instanceof Array) {
+      var result = sfig_.newElem('div');
+      if (content[0]) result.appendChild(sfig_.ensureHTMLElement(content[0]));
+      var ul = sfig_.newElem('ul');
+      ul.style.margin = 0;
+      for (var i = 1; i < content.length; i++) {
+        var li = sfig_.newElem('li');
+        li.appendChild(Text.bulletize(content[i]));
+        ul.appendChild(li);
+      }
+      result.appendChild(ul);
+      return result;
+    }
+    return sfig_.ensureHTMLElement(content);
   }
 
   // Due to MathJax, renderElem doesn't callback.
@@ -1289,9 +1323,9 @@ sfig.defaultPrintNumColsPerPage = 2;
     var content = this.content().getOrDie();
     if (this.bulleted().get()) {
       if (typeof(content) == 'string') content = [null, content];
-      content = bulletize(content);
+      content = Text.bulletize(content);
     }
-    div.innerHTML = content;
+    div.appendChild(sfig_.ensureHTMLElement(content));
 
     var font = this.font().getOrDie();
     var fontSize = this.fontSize().getOrDie();
@@ -1893,7 +1927,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   sfig_.addProperty(Wrap, 'content', null, 'What to draw');
 
-  sfig.wrap = function(block) { return new sfig.Wrap().content(sfig.std(block)); }
+  sfig.wrap = function(block) { return new sfig.Wrap().content(block); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -2808,9 +2842,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     function blockToHtml(block, compressUnaries) {
       if (block instanceof sfig.Text) {
-        var div = sfig_.newElem('div');
-        div.innerHTML = block.content().get();
-        return div;
+        return sfig.Text.bulletize(block.content().get());
       } else if (block instanceof sfig.Slide) {
         return blockToHtml(block.body, compressUnaries);
       } else {
