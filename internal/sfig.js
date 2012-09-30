@@ -2591,6 +2591,25 @@ sfig.defaultPrintNumColsPerPage = 2;
       self.keyQueue.push(key);
       processKeyQueue(function() {});
     }, false);
+
+    // Allow scrolling to go to previous and next slide builds
+    function handleMouseWheel(event) {
+      var delta = 0;
+      if (event.wheelDelta) // IE, Opera, Chrome
+        delta = event.wheelDelta / 60;
+      else if (event.detail) // Firefox
+        delta = -event.detail / 2;
+
+      if (delta > 0) {
+        self.keyQueue.push('up');
+        processKeyQueue(function() {});
+      } else if (delta < 0) {
+        self.keyQueue.push('down');
+        processKeyQueue(function() {});
+      }
+    }
+    document.onmousewheel = handleMouseWheel;
+    document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
   }
 
   Presentation.prototype.getHelpBlock = function() {
