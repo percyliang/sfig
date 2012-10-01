@@ -13,6 +13,7 @@ sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
 sfig.defaultBgColor = 'white';
+sfig.defaultExplanationScale = 0.8;  // When popup an explanation, make a bit smaller.
 
 sfig.enableMath = true;  // Whether to render LaTeX math using MathJax.
 sfig.enableAnimations = true;  // Whether to allow animations.
@@ -116,8 +117,10 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (item instanceof sfig.Block) return item;
     if (item instanceof sfig.AuxiliaryInfo) return item;
     if (item instanceof sfig.PropertyChanger) return item;
+    if (item instanceof HTMLElement) return sfig.text(item);
     var type = typeof(item);
-    if (type == 'string' || type == 'number') return sfig.text(''+item);  // Convert strings and numbers to text
+    if (type == 'string') return sfig.text(item);
+    if (type == 'number') return sfig.text(''+item);  // Convert strings and numbers to text
     if (item.length != null) {  // Array and Arguments
       var newList = [];
       for (var i = 0; i < item.length; i++) {
@@ -732,6 +735,23 @@ sfig.defaultPrintNumColsPerPage = 2;
     return this;
   }
 
+  // For all children, recursively take their appendices and add them as children.
+  // The appendix feature allows one to add content locally and have it show up later (good for labels and dropdowns).
+  Block.prototype.closeAppendices = function() {
+    this.freeze();
+    var self = this;
+    function gather(block) {
+      var appendix = block.appendix();
+      if (appendix.get()) {
+        self.addChild(sfig.std(appendix.get()));
+        appendix.set(null);
+      }
+      block.children.forEach(gather);
+    }
+    gather(this);
+    return this;
+  }
+
   sfig_.addProperty(Animate, 'duration', '1s', 'Time to spend performing the animation');
   sfig_.addProperty(Block, 'replace', null, 'Object to hide when this object is shown.');
 
@@ -775,6 +795,8 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   sfig_.addMapProperty(Block, 'partOnClick', null, 'Function to call when part of the object is clicked.');
   sfig_.addMapProperty(Block, 'partTooltip', null, 'String to display when mouse goes over.');
+
+  sfig_.addProperty(Block, 'appendix', null, 'Block which will be added in a big Overlay at the top-level.');
 
   // Rendered properties.
   // The bounding box of this object as perceived by the outside world
@@ -1266,6 +1288,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   sfig.divLinkToInternal = function(div, prez, slideId, level) {
+    div = sfig_.ensureHTMLElement(div);
     div.onclick = function(event) {
       if (event.ctrlKey)
         sfig_.goToPresentation(sfig_.currPresentationName(), slideId, level, true);
@@ -2350,8 +2373,11 @@ sfig.defaultPrintNumColsPerPage = 2;
     var pivot = options.pivot;
     if (pivot == null) throw 'Missing pivot';
 
-    button = sfig.frame(button).bg.strokeWidth(options.borderWidth || 1).end.padding(5);
-    explanation = frame(explanation).bg.fillColor('white').strokeWidth(1).end.padding(5);
+    button = sfig.std(button);
+    if (options.borderWidth)
+      button = sfig.frame(button).bg.round(5).strokeWidth(options.borderWidth).end.padding(5);
+    explanation = frame(explanation).bg.fillColor('white').strokeWidth(2).end.padding(5);
+    explanation.scale(options.explanationScale || sfig.defaultExplanationScale); 
     var x, y;
     if (pivot[0] == -1) x = button.left();
     else if (pivot[0] == 1) x = button.right();
@@ -2367,7 +2393,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       else
         button.bg.elem.style.fill = 'none';
     });
-    return sfig.overlay(button, explanation);
+    return button.appendix(explanation);
   }
 
   // Set default text width based on slide width
@@ -2395,11 +2421,10 @@ sfig.defaultPrintNumColsPerPage = 2;
       // Add notes and help
       var items = [];
       var notes = slide.notes().get();
-      if (notes) {
-        items.push(sfig.explain('Notes', std(notes).scale(1.5), {pivot: [1, -1]}));
-      }
+      if (notes)
+        items.push(sfig.explain('Notes', notes, {pivot: [1, -1], borderWidth: 1}));
       if (slide.showHelp().get())
-        items.push(sfig.explain('Help', this.getHelpBlock().scale(1.5), {pivot: [1, -1]}));
+        items.push(sfig.explain('Help', this.getHelpBlock(), {pivot: [1, -1], borderWidth: 1}));
       if (slide.rightHeader().exists())
         items.push(slide.rightHeader().get());
       if (items.length > 0)
@@ -2411,6 +2436,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     slide.state = sfig_.newState();
     slide.freeze();
+    slide.closeAppendices();
     this.slides.push(slide);
   }
 
