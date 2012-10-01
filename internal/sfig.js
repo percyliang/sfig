@@ -287,6 +287,12 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.cosDegrees = function(angle) { return Math.cos(angle / 180 * Math.PI); }
   sfig_.sinDegrees = function(angle) { return Math.sin(angle / 180 * Math.PI); }
 
+  // Make sure angle is in the range [0, 360)
+  sfig_.stdDegrees = function(angle) {
+    if (angle < 0) return 360 - (-angle % 360);
+    return angle % 360;
+  }
+
   // Input: '#a=b'
   // Output: {'a': 'b'}
   sfig_.parseUrlParams = function(href) {
@@ -793,6 +799,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
     if (c != null) return this.children[c].clipPoint(angle);
 
+    angle = sfig_.stdDegrees(angle);
     this.ensureRendered();
     var dx = sfig_.cosDegrees(angle);
     var dy = sfig_.sinDegrees(angle);
