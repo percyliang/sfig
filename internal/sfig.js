@@ -2255,6 +2255,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     callback();
   };
 
+  Table.prototype.closeAppendices = function() { throw 'Not supported for tables'; }
+
   Table.prototype.center = function() { return this.justify('c', 'c'); }
   sfig_.addPairProperty(Table, 'justify', 'xjustify', 'yjustify', null, null, 'Justification string consisting of l (left), c (center), or r (right)');
   sfig_.addPairProperty(Table, 'margin', 'xmargin', 'ymargin', null, null, 'Amount of space between rows/columns');
@@ -2376,7 +2378,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     button = sfig.std(button);
     if (options.borderWidth)
       button = sfig.frame(button).bg.round(5).strokeWidth(options.borderWidth).end.padding(5);
-    explanation = frame(explanation).bg.fillColor('white').strokeWidth(2).end.padding(5);
+    explanation = frame(explanation).bg.fillColor('#F7F9D0').strokeWidth(2).end.padding(5);
     explanation.scale(options.explanationScale || sfig.defaultExplanationScale); 
     var x, y;
     if (pivot[0] == -1) x = button.left();
@@ -2821,6 +2823,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   Presentation.prototype.updateUrlParams = function() {
     var self = this;
+    sfig_.urlParams.slideId = null;
     sfig_.urlParams.slideIndex = self.currSlideIndex;
     sfig_.urlParams.level = self.currLevel;
     sfig_.serializeUrlParamsToLocation();
