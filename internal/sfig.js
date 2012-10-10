@@ -290,6 +290,13 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.cosDegrees = function(angle) { return Math.cos(angle / 180 * Math.PI); }
   sfig_.sinDegrees = function(angle) { return Math.sin(angle / 180 * Math.PI); }
 
+  sfig_.rotateDegrees = function(p, angle) {
+    var cos = sfig_.cosDegrees(angle);
+    var sin = sfig_.sinDegrees(angle);
+    var x = p[0], y = p[1];
+    return [x * cos + y * sin, y * cos - x * sin];
+  }
+
   // Make sure angle is in the range [0, 360)
   sfig_.stdDegrees = function(angle) {
     if (angle < 0) return 360 - (-angle % 360);
@@ -320,6 +327,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
     return str;
   }
+
+  sfig_.urlParams = {};
 
   sfig_.parseUrlParamsFromLocation = function() {
     sfig_.urlHash = window.location.hash;
@@ -821,6 +830,10 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
     if (c != null) return this.children[c].clipPoint(angle);
 
+    /*var rotate = this.rotate().getOrElse(0);
+    sfig.L(rotate);
+    angle -= rotate;*/
+
     angle = sfig_.stdDegrees(angle);
     this.ensureRendered();
     var dx = sfig_.cosDegrees(angle);
@@ -850,6 +863,11 @@ sfig.defaultPrintNumColsPerPage = 2;
       dy *= Math.abs(mx / dx);
       dx = mx;
     }
+
+    // Rotate back
+    //var result = sfig_.rotateDegrees([dx, dy], rotate);
+    //dx = result[0], dy = result[1];
+    
     return [this.left().get() + mx + dx, this.top().get() + my + dy];
   }
 
@@ -1032,6 +1050,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (reverse && this.replace().get() != null) this.replace().get().show(reverse);
   }
   Block.prototype.toggleShowHide = function(reverse) {
+    // TODO: in Firefox, this messes up MathJax
     // Recursively set the display to whatever is opposite of what the top level is.
     // Return whether it's shown
     var target = this.elem.style.display == 'none' ? null : 'none';
@@ -2407,9 +2426,11 @@ sfig.defaultPrintNumColsPerPage = 2;
 
 (function() {
   // container is optional
-  var Presentation = sfig.Presentation = function() {
+  var Presentation = sfig.Presentation = function(options) {
+    if (!options) options = {};
     this.slides = [];
-    this.initKeys();
+    if (options.initKeys == null || options.initKeys)
+      this.initKeys();
   }
 
   Presentation.prototype.addSlide = function(slide) {
@@ -3096,7 +3117,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   // Create a figure from |block| and render it into |container|.
   sfig.figure = function(block, container) {
     if (typeof(container) == 'string') container = document.getElementById(container);
-    var prez = sfig.presentation();
+    var prez = sfig.presentation({initKeys: false});
     prez.addSlide(block);
     prez.displayPrinterFriendly(container);
   }
