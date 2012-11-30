@@ -7,7 +7,7 @@
     this.edgeLabel = edgeLabel != null ? sfig.std(edgeLabel) : null;
     if (child == null) throw 'No child: '+child;
     this.child = (child instanceof sfig.RootedTree) ? child : sfig.rootedTree(child);
-    this.edge = sfig.decoratedLine(false, false); // No arrows, end points set later
+    this.edge = new sfig.DecoratedLine(); // No arrows, end points set later
     this.edge.setEnd(this);
   }
   sfig_.inheritsFrom('RootedTreeBranch', RootedTreeBranch, sfig.AuxiliaryInfo);

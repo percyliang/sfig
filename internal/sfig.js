@@ -19,8 +19,7 @@ sfig.enableMath = true;  // Whether to render LaTeX math using MathJax.
 sfig.enableAnimations = true;  // Whether to allow animations.
 sfig.enableTiming = false;  // Enable to see how long it takes to render.
 sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
-
-Image.useCachedImages = false;  // Whether to used cached images
+sfig.enableMouseWheel = true;  // Whether allow mouse wheel to scroll
 
 sfig.defaultPrintNumRowsPerPage = 3;
 sfig.defaultPrintNumColsPerPage = 2;
@@ -52,14 +51,16 @@ sfig.defaultPrintNumColsPerPage = 2;
   // Concatenate strings
   sfig.cat = function() { return Array.prototype.slice.call(arguments).join(''); }
 
+  sfig.defaultCursor = '';
   sfig.setPointerCursor = function() {
     document.documentElement.style.cursor = 'pointer';
   }
   sfig.resetCursor = function() {
-    document.documentElement.style.cursor = '';
+    document.documentElement.style.cursor = sfig.defaultCursor;
   }
   sfig.setLaserPointerCursor = function() {
-    document.documentElement.style.cursor = 'url("red-dot.png"), auto';
+    sfig.defaultCursor = 'url("'+sfig.getInternalDir()+'/../images/red-dot.png"), auto';
+    sfig.resetCursor();
   }
 
   sfig.identity = function(x) { return x; };
@@ -139,12 +140,14 @@ sfig.defaultPrintNumColsPerPage = 2;
   // Create an element with the desired attributes.
   sfig_.newElem = function(type) { return document.createElement(type); }
   sfig_.svgns = 'http://www.w3.org/2000/svg';
-  sfig_.newSvgElem = function(type) { return document.createElementNS(sfig_.svgns, type); }
+  sfig_.newSvgElem = function(type) {
+    return document.createElementNS(sfig_.svgns, type);
+  }
   sfig_.newSvg = function() {
     return sfig_.newSvgElem('svg', {
       id: 'svg',
       xmlns: sfig_.svgns,
-      version: '1.1',
+      version: '1.1'
     });
   }
 
@@ -197,6 +200,13 @@ sfig.defaultPrintNumColsPerPage = 2;
     return div;
   }
 
+  sfig_.addTooltipToElem = function(elem, str) {
+    var title = sfig_.newSvgElem('title');
+    title.textContent = str;
+    elem.appendChild(title);
+    return elem;
+  }
+
   var codeToKey = {
     8 : 'backspace',
     9 : 'tab',
@@ -212,7 +222,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     38 : 'up',
     39 : 'right',
     40 : 'down',
-    191: '/',
+    191: '/'
   };
   sfig_.eventToKey = function(event) {
     var key = '';
@@ -723,7 +733,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       if (item.parent != null) throw 'Already has parent, trying to give another: '+item;
       item.parent = this;
       if (!item.showLevel().exists()) {  // Only propagate to/from item if its level is specified
-        // env -> item [if not exists]
+        // env -> item
         item.showLevel(this.env.showLevel);
         // item.env -> env
         this.env.showLevel = item.env.showLevel;
@@ -801,6 +811,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addProperty(Block, 'onMouseover', null, 'Function to call when mouse moves over object.');
   sfig_.addProperty(Block, 'onMouseout', null, 'Function to call when mouse moves out of object.');
   sfig_.addProperty(Block, 'onShow', null, 'Function to call when object is shown.');
+  sfig_.addProperty(Block, 'onUpdateUrlParams', null, 'For top-level objects (slides), call when URL parameters are updated');
 
   sfig_.addMapProperty(Block, 'partOnClick', null, 'Function to call when part of the object is clicked.');
   sfig_.addMapProperty(Block, 'partTooltip', null, 'String to display when mouse goes over.');
@@ -1168,11 +1179,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     // Add additional properties
     // TODO: works in Chrome, but doesn't work in Firefox
-    if (this.tooltip().get() != null) {
-      var title = sfig_.newSvgElem('title');
-      title.textContent = this.tooltip().get();
-      this.elem.appendChild(title);
-    }
+    if (this.tooltip().get() != null) sfig_.addTooltipToElem(this.elem, this.tooltip().get());
     if (this.onClick().get() != null) this.elem.onclick = sfig_.funcPrependArg(this.onClick().get(), this);
     if (this.onMouseover().get() != null) this.elem.onmouseover = sfig_.funcPrependArg(this.onMouseover().get(), this);
     if (this.onMouseout().get() != null) this.elem.onmouseout = sfig_.funcPrependArg(this.onMouseout().get(), this);
@@ -1317,8 +1324,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     return sfig.divSetPointerWhenMouseOver(div);
   }
 
-  Block.prototype.linkToExternal = function(name, slideId, level) {
-    this.onClick(function() { sfig_.goToPresentation(name, slideId, level, true); });
+  Block.prototype.linkToExternal = function(name, slideId, level, extraUrlParams) {
+    this.onClick(function() { sfig_.goToPresentation(name, slideId, level, true, extraUrlParams); });
     return this.setPointerWhenMouseOver();
   }
 })();
@@ -1346,6 +1353,8 @@ sfig.defaultPrintNumColsPerPage = 2;
       ul.style.margin = 0;
       for (var i = 1; i < content.length; i++) {
         var li = sfig_.newElem('li');
+        //li.style.listStyleType = 'square';
+        //li.style.listStyleImage = 'url("'+sfig.getInternalDir()+'/../images/blue-sphere.png")';
         li.appendChild(Text.bulletize(content[i]));
         ul.appendChild(li);
       }
@@ -1409,6 +1418,11 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addProperty(Text, 'width', null, 'Affects wrapping');
   sfig_.addProperty(Text, 'bulleted', null, 'Whether to prepend a bullet');
 
+  Text.prototype.noWrap = function() { return this.width(1000000); }
+  // only scale font down, not the width
+  //Text.prototype.scaleFont = function(s) { return this.fontSize(Math.round(this.fontSize().get() / s)); }
+  Text.prototype.scaleFont = function(s) { return this.scale(s).width(Text.defaults.getProperty('width').get() / s); }
+
   sfig.text = function(content) { return new Text().content(content); }
   sfig.bulletedText = function(content) { return sfig.text(content).bulleted(true); }
 })();
@@ -1432,7 +1446,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     var content = this.content().get();
 
     var text;
-    if (this.multiline().get()) {
+    if (numRows == 1 /*this.multiline().get()*/) {
       text = sfig_.newElem('input');
       text.type = 'text';
       text.size = numCols;
@@ -1486,6 +1500,19 @@ sfig.defaultPrintNumColsPerPage = 2;
     this.elem = elem;
     this.textElem = elem.firstChild;
     callback();
+  }
+
+  // Return whether the textbox has changed.
+  TextBox.prototype.updateContent = function() {
+    var newContent = this.textElem.value;
+    if (newContent == this.content().get()) return false;
+    this.content(newContent);
+    return true;
+  }
+
+  TextBox.prototype.focusFunc = function() {
+    var self = this;
+    return function() { self.focus(); };
   }
 
   TextBox.prototype.focus = function() { return this.textElem.focus(); }
@@ -1559,7 +1586,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   // Call |addTo| on an SVG element (<g/>) and return it (e.g., for d3)
   sfig.rawAddSvg = function(addTo) {
-    return raw(function() {
+    return sfig.raw(function() {
       var g = sfig_.newSvgElem('g');
       addTo(g);
       return g;
@@ -1821,11 +1848,13 @@ sfig.defaultPrintNumColsPerPage = 2;
   Line.prototype.arg1 = function(arg1) {
     if (arg1 instanceof Array) this.p1(arg1[0], arg1[1]);
     else if (arg1 instanceof sfig.Block) this.b1(arg1);
+    else throw 'Bad arg1: ' + arg1;
     return this;
   }
   Line.prototype.arg2 = function(arg2) {
     if (arg2 instanceof Array) this.p2(arg2[0], arg2[1]);
     else if (arg2 instanceof sfig.Block) this.b2(arg2);
+    else throw 'Bad arg2: ' + arg2;
     return this;
   }
 
@@ -2470,7 +2499,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       showBlocks: [],
       hideBlocks: [],
       animateBlocks: [],
-      rendered: false,
+      rendered: false
     };
   }
 
@@ -2664,8 +2693,10 @@ sfig.defaultPrintNumColsPerPage = 2;
         processKeyQueue(function() {});
       }
     }
-    document.onmousewheel = handleMouseWheel;
-    document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
+    if (sfig.enableMouseWheel) {
+      document.onmousewheel = handleMouseWheel;
+      document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
+    }
   }
 
   Presentation.prototype.getHelpBlock = function() {
@@ -2858,6 +2889,18 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (slideId != null) slideIndex = this.slideIdToSlideIndex(slideId);
     var level = parseInt(params.level);
     if (level == null || !isFinite(level)) level = 0;
+
+    // Notify slide of URL changes before setting the slide
+    var slide = this.slides[Math.min(slideIndex, this.slides.length-1)];
+    if (slide != null) {
+      var onUpdateUrlParams = slide.onUpdateUrlParams().get();
+      if (onUpdateUrlParams) {
+        onUpdateUrlParams(params);
+        slide.resetRender();
+        slide.freeze();
+      }
+    }
+
     this.setSlideIndexAndLevel(slideIndex, level, callback);
   }
 
@@ -2895,6 +2938,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     window.onhashchange = function() {
       // If changed externally (not reflected by sfig_.urlHash), then force refresh.
+      // This happens when user presses back or forward.
       if (window.location.hash != sfig_.urlHash) {
         var oldUrlParams = sfig_.urlParams;
         sfig_.parseUrlParamsFromLocation();
@@ -2945,7 +2989,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       div.style.margin = 10;
 
       var title = sfig_.newElem('a');
-      title.innerHTML = ('Slide '+i + (slide.title && slide.title().get() ? ': '+slide.title().get() : '')).bold();
+      title.innerHTML = ('Slide ' + i + (slide.title && slide.title().get() ? ': '+slide.title().get() : '')).bold();
       title.href = window.location.pathname + sfig_.serializeUrlParams({slideIndex: i});
       div.appendChild(title);
 
@@ -3049,9 +3093,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     return script;
   }
 
-  sfig.initialize = function() {
-    sfig_.parseUrlParamsFromLocation();
-
+  sfig.getInternalDir = function() {
     // Hack: find where this file (sfig.js) is.
     // Assume the external directory is one level down.
     var scripts = document.getElementsByTagName('script');
@@ -3061,9 +3103,14 @@ sfig.defaultPrintNumColsPerPage = 2;
       if (!file.match(/sfig\.js$/)) continue;
       parentDir = file.replace(/\/[^\/]*$/, '');
     }
+    return parentDir;
+  }
+
+  sfig.initialize = function() {
+    sfig_.parseUrlParamsFromLocation();
 
     if (sfig.enableMath) {
-      var script = sfig_.includeScript(parentDir + '/../external/MathJax/MathJax.js?config=default');
+      var script = sfig_.includeScript(sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default');
       var buf = '';
       buf += 'MathJax.Hub.Config({';
       // TODO: want to remove this condition and not use the SVG jax, but there are problems.
@@ -3074,7 +3121,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       //   - normal: works great, except when we print from this, the text is completely mis-aligned.
       //   - jax=SVG: only needed for printing.
       if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
-      buf += '  extensions: ["tex2jax.js"],';
+      buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js"],';
       buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
       buf += '  TeX: { Macros: {';
       for (var name in sfig_.latexMacros) {
@@ -3097,11 +3144,12 @@ sfig.defaultPrintNumColsPerPage = 2;
     return window.location.pathname.match(/\/([^\/]+)\.html/)[1];
   }
 
-  sfig_.goToPresentation = function(name, slideId, level, newWindow) {
+  sfig_.goToPresentation = function(name, slideId, level, newWindow, extraUrlParams) {
     var urlParams = newWindow ? sfig_.mergeInto({}, sfig_.urlParams) : sfig_.urlParams;
     urlParams.slideIndex = null;
     urlParams.slideId = slideId;
     urlParams.level = level;
+    if (extraUrlParams) mergeInto(urlParams, extraUrlParams);
 
     // name is the filename (without the html extension) of the sfig presentation to go to.
     var pathname = window.location.pathname.replace(/\/[^\/]+\.html/, '/'+name+'.html');
@@ -3109,9 +3157,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     var url = pathname + urlHash;
     if (newWindow)
       window.open(url);
-    else {
+    else
       window.location.href = url;
-    }
   }
 
   // Create a figure from |block| and render it into |container|.

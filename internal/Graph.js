@@ -248,7 +248,7 @@
 
   // Axis
   sfig_.addPairProperty(Graph, 'axisLabel', 'xaxisLabel', 'yaxisLabel', null, null, 'Labels of the axes');
-  sfig_.addPairProperty(Graph, 'axisLabelPadding', 'xaxisLabelPadding', 'yaxisLabelPadding', 25, 35, 'How much space to put between the axis label and the tick labels');
+  sfig_.addPairProperty(Graph, 'axisLabelPadding', 'xaxisLabelPadding', 'yaxisLabelPadding', 35, 35, 'How much space to put between the axis label and the tick labels');
   sfig_.addPairProperty(Graph, 'legendPivot', 'xlegendPivot', 'ylegendPivot', null, null, 'Where to put the legend');
 })();
 
