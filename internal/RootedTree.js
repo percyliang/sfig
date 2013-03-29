@@ -97,6 +97,7 @@
         b.edge.line.b1(this.headBox);
         b.edge.line.b2(b.child.headBox);
       }
+      b.edge.drawArrow1(this.drawArrow1()).drawArrow2(this.drawArrow2());
       this.addChild(b.edge);
 
       // Edge label
@@ -113,7 +114,8 @@
   sfig_.addPairProperty(RootedTree, 'margin', 'xmargin', 'ymargin', 30, 30, 'Amount of space between siblings and parent/child.');
   sfig_.addProperty(RootedTree, 'nodePadding', 3, 'Amount of space inside a node');
   sfig_.addProperty(RootedTree, 'nodeBorderWidth', 1, 'How thick to make node');
-  sfig_.addProperty(RootedTree, 'nodeRound', 5, 'How rounded?');
+  sfig_.addProperty(RootedTree, 'nodeRound', 5, 'How rounded are the nodes?');
+  sfig_.addPairProperty(RootedTree, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Are the edges directed (up, down)?');
   sfig_.addProperty(RootedTree, 'verticalCenterEdges', null, 'For drawing parse trees, have edges converge');
   sfig_.addProperty(RootedTree, 'tail', null, 'Draw this after everything');
 
@@ -128,7 +130,7 @@
       return this;
     }
   }
-  ['margin', 'xmargin', 'ymargin', 'nodePadding', 'nodeBorderWidth', 'nodeRound', 'verticalCenterEdges'].forEach(function(name) {
+  ['margin', 'xmargin', 'ymargin', 'nodePadding', 'nodeBorderWidth', 'nodeRound', 'drawArrow', 'drawArrow1', 'drawArrow2', 'verticalCenterEdges'].forEach(function(name) {
     addRecursiveProperty('rec'+name, name);
   });
 

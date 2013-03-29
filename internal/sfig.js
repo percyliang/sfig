@@ -13,6 +13,7 @@ sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
 sfig.defaultBgColor = 'white';
+sfig.defaultExplanationScale = 0.8;  // When popup an explanation, make a bit smaller.
 
 sfig.enableMath = true;  // Whether to render LaTeX math using MathJax.
 sfig.enableAnimations = true;  // Whether to allow animations.
@@ -119,8 +120,10 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (item instanceof sfig.Block) return item;
     if (item instanceof sfig.AuxiliaryInfo) return item;
     if (item instanceof sfig.PropertyChanger) return item;
+    if (item instanceof HTMLElement) return sfig.text(item);
     var type = typeof(item);
-    if (type == 'string' || type == 'number') return sfig.text(''+item);  // Convert strings and numbers to text
+    if (type == 'string') return sfig.text(item);
+    if (type == 'number') return sfig.text(''+item);  // Convert strings and numbers to text
     if (item.length != null) {  // Array and Arguments
       var newList = [];
       for (var i = 0; i < item.length; i++) {
@@ -146,6 +149,11 @@ sfig.defaultPrintNumColsPerPage = 2;
       xmlns: sfig_.svgns,
       version: '1.1',
     });
+  }
+
+  sfig_.mergeInto = function(target, source) {
+    for (var key in source) target[key] = source[key];
+    return target;
   }
 
   sfig_.rectToString = function(r) { return r.x+','+r.y+';'+r.width+'x'+r.height; }
@@ -182,6 +190,14 @@ sfig.defaultPrintNumColsPerPage = 2;
     transformed.setAttribute('transform', 'translate('+x+','+y+')');
     transformed.appendChild(elem);
     return transformed;
+  }
+
+  // x is either already an HTMLElement or a string which is to be parsed as such
+  sfig_.ensureHTMLElement = function(x) {
+    if (x instanceof HTMLElement) return x;
+    var div = sfig_.newElem('div');
+    div.innerHTML = x;
+    return div;
   }
 
   var codeToKey = {
@@ -277,6 +293,19 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.cosDegrees = function(angle) { return Math.cos(angle / 180 * Math.PI); }
   sfig_.sinDegrees = function(angle) { return Math.sin(angle / 180 * Math.PI); }
 
+  sfig_.rotateDegrees = function(p, angle) {
+    var cos = sfig_.cosDegrees(angle);
+    var sin = sfig_.sinDegrees(angle);
+    var x = p[0], y = p[1];
+    return [x * cos + y * sin, y * cos - x * sin];
+  }
+
+  // Make sure angle is in the range [0, 360)
+  sfig_.stdDegrees = function(angle) {
+    if (angle < 0) return 360 - (-angle % 360);
+    return angle % 360;
+  }
+
   // Input: '#a=b'
   // Output: {'a': 'b'}
   sfig_.parseUrlParams = function(href) {
@@ -301,6 +330,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
     return str;
   }
+
+  sfig_.urlParams = {};
 
   sfig_.parseUrlParamsFromLocation = function() {
     sfig_.urlHash = window.location.hash;
@@ -716,6 +747,23 @@ sfig.defaultPrintNumColsPerPage = 2;
     return this;
   }
 
+  // For all children, recursively take their appendices and add them as children.
+  // The appendix feature allows one to add content locally and have it show up later (good for labels and dropdowns).
+  Block.prototype.closeAppendices = function() {
+    this.freeze();
+    var self = this;
+    function gather(block) {
+      var appendix = block.appendix();
+      if (appendix.get()) {
+        self.addChild(sfig.std(appendix.get()));
+        appendix.set(null);
+      }
+      block.children.forEach(gather);
+    }
+    gather(this);
+    return this;
+  }
+
   sfig_.addProperty(Animate, 'duration', '1s', 'Time to spend performing the animation');
   sfig_.addProperty(Block, 'replace', null, 'Object to hide when this object is shown.');
 
@@ -760,6 +808,8 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addMapProperty(Block, 'partOnClick', null, 'Function to call when part of the object is clicked.');
   sfig_.addMapProperty(Block, 'partTooltip', null, 'String to display when mouse goes over.');
 
+  sfig_.addProperty(Block, 'appendix', null, 'Block which will be added in a big Overlay at the top-level.');
+
   // Rendered properties.
   // The bounding box of this object as perceived by the outside world
   // for purposes of layout (doesn't actually have to be the real bounding
@@ -785,6 +835,11 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
     if (c != null) return this.children[c].clipPoint(angle);
 
+    /*var rotate = this.rotate().getOrElse(0);
+    sfig.L(rotate);
+    angle -= rotate;*/
+
+    angle = sfig_.stdDegrees(angle);
     this.ensureRendered();
     var dx = sfig_.cosDegrees(angle);
     var dy = sfig_.sinDegrees(angle);
@@ -813,6 +868,11 @@ sfig.defaultPrintNumColsPerPage = 2;
       dy *= Math.abs(mx / dx);
       dx = mx;
     }
+
+    // Rotate back
+    //var result = sfig_.rotateDegrees([dx, dy], rotate);
+    //dx = result[0], dy = result[1];
+    
     return [this.left().get() + mx + dx, this.top().get() + my + dy];
   }
 
@@ -995,6 +1055,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (reverse && this.replace().get() != null) this.replace().get().show(reverse);
   }
   Block.prototype.toggleShowHide = function(reverse) {
+    // TODO: in Firefox, this messes up MathJax
     // Recursively set the display to whatever is opposite of what the top level is.
     // Return whether it's shown
     var target = this.elem.style.display == 'none' ? null : 'none';
@@ -1233,10 +1294,32 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   Block.prototype.linkToInternal = function(prez, slideId, level) {
-    this.onClick(function() {
-      prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
+    this.onClick(function(block, event) {
+      if (event.ctrlKey)
+        sfig_.goToPresentation(sfig_.currPresentationName(), slideId, level, true);
+      else
+        prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
     });
     return this.setPointerWhenMouseOver();
+  }
+
+  // Parallel setPointerWhenMouseOver() and linkToInternal() for divs.
+  // Need these to modify the links of HTML elements which are not represented by a block.
+  sfig.divSetPointerWhenMouseOver = function(div) {
+    div.onmouseover = function() { sfig.setPointerCursor(); };
+    div.onmouseout = function() { sfig.resetCursor(); };
+    return div;
+  }
+
+  sfig.divLinkToInternal = function(div, prez, slideId, level) {
+    div = sfig_.ensureHTMLElement(div);
+    div.onclick = function(event) {
+      if (event.ctrlKey)
+        sfig_.goToPresentation(sfig_.currPresentationName(), slideId, level, true);
+      else
+        prez.setSlideIdAndLevel(slideId, level, function() { sfig.resetCursor(); });
+    };
+    return sfig.divSetPointerWhenMouseOver(div);
   }
 
   Block.prototype.linkToExternal = function(name, slideId, level) {
@@ -1260,13 +1343,21 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   // TODO: disadvantage with building bulleted lists this way is that it must
   // be text all rendered at once (can't put pause()).
-  function bulletize(content) {
-    if (typeof(content) == 'string') return content;
-    var result = (content[0] ? content[0] : '') + '<ul style="margin:0">';
-    for (var i = 1; i < content.length; i++)
-      result += '<li>' + bulletize(content[i]) + '</li>';
-    result += '</ul>';
-    return result;
+  Text.bulletize = function(content) {
+    if (content instanceof Array) {
+      var result = sfig_.newElem('div');
+      if (content[0]) result.appendChild(sfig_.ensureHTMLElement(content[0]));
+      var ul = sfig_.newElem('ul');
+      ul.style.margin = 0;
+      for (var i = 1; i < content.length; i++) {
+        var li = sfig_.newElem('li');
+        li.appendChild(Text.bulletize(content[i]));
+        ul.appendChild(li);
+      }
+      result.appendChild(ul);
+      return result;
+    }
+    return sfig_.ensureHTMLElement(content);
   }
 
   // Due to MathJax, renderElem doesn't callback.
@@ -1286,9 +1377,9 @@ sfig.defaultPrintNumColsPerPage = 2;
     var content = this.content().getOrDie();
     if (this.bulleted().get()) {
       if (typeof(content) == 'string') content = [null, content];
-      content = bulletize(content);
+      content = Text.bulletize(content);
     }
-    div.innerHTML = content;
+    div.appendChild(sfig_.ensureHTMLElement(content));
 
     var font = this.font().getOrDie();
     var fontSize = this.fontSize().getOrDie();
@@ -1532,7 +1623,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       return new image(local);
     } else {
       // Use web version, but suggest caching
-      sfig_.cachedCommands.push('wget \''+href+'\' -O '+local);
+      sfig_.cachedCommands.push('wget -c \''+href+'\' -O '+local);
       return new image(href);
     }
   }
@@ -1611,8 +1702,6 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.inheritsFrom('Line', Line, sfig.Block);
 
   Line.prototype.renderElem = function(state, callback) {
-    var elem = sfig_.newSvgElem('line');
-
     // Get positions
     var x1, y1, x2, y2;
     if (this.b1().get() != null) {
@@ -1646,16 +1735,13 @@ sfig.defaultPrintNumColsPerPage = 2;
       x2 = p2[0], y2 = p2[1];
     }
 
-    // Save our rendered values
+    // Save our rendered values (note: before shrinking)
     this.realAngle1(angle1);
     this.realAngle2(angle2);
     this.realx1(x1);
     this.realy1(y1);
     this.realx2(x2);
     this.realy2(y2);
-
-    // TODO: set angles
-    // TODO: curved lines
 
     // Apply shrink - note doesn't affect the real coordinates
     var shrink1 = this.shrink1().get();
@@ -1669,26 +1755,51 @@ sfig.defaultPrintNumColsPerPage = 2;
       y2 += shrink2 * sfig_.sinDegrees(angle2);
     }
 
-    // Compute label position (on the shrunk versions)
-    // Label is always in a negative y direction
-    var x = (x1 + x2) / 2;
-    var y = (y1 + y2) / 2;
+    // Compute label position (note: on the shrunk coordinates)
+    // alwaysUp: label is always in a negative y direction
+    // frac: what fraction of the way from p1 to p2
+    // soar: how much to go above the line at |frac|
+    function getPoint(frac, soar, alwaysUp) {
+      var x = frac * x1 + (1-frac) * x2;
+      var y = (y1 + y2) / 2;
+      var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+      var dx = -(y2-y1) / len;
+      var dy = +(x2-x1) / len;
+      if (alwaysUp && dy > 0) { dx = -dx; dy = -dy;}
+      x += soar * dx;
+      y += soar * dy;
+      return {x: x, y: y};
+    }
+
+    // Place label
     var labelDist = this.labelDist().getOrDie();
-    var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
-    var dx = -(y2-y1) / len;
-    var dy = +(x2-x1) / len;
-    if (dy > 0) { dx = -dx; dy = -dy;}
-    x += labelDist * dx;
-    y += labelDist * dy;
-    this.plabel(x, y);
+    var labelpt = getPoint(0.5, labelDist, true);
+    this.plabel(labelpt.x, labelpt.y);
 
     // Draw line
-    elem.setAttribute('x1', x1);
-    elem.setAttribute('y1', y1);
-    elem.setAttribute('x2', x2);
-    elem.setAttribute('y2', y2);
+    var ctrlx1 = this.ctrlx1().get();
+    var ctrly1 = this.ctrly1().get();
+    var curve = this.curve().get();
+    if (curve) {
+      var ctrlpt = getPoint(0.5, curve, false);
+      ctrlx1 = ctrlpt.x;
+      ctrly1 = ctrlpt.y;
+    }
+    //sfig.L(curve, ctrlx1, ctrly1);
 
-    this.elem = elem;
+    if (ctrlx1 != null) {
+      this.elem = sfig_.newSvgElem('path');
+      var spec = 'M'+x1+','+y1+' '+'Q'+ctrlx1+','+ctrly1+' '+x2+','+y2;
+      //sfig.L(spec);
+      this.elem.setAttribute('d', spec);
+    } else {
+      this.elem = sfig_.newSvgElem('line');
+      this.elem.setAttribute('x1', x1);
+      this.elem.setAttribute('y1', y1);
+      this.elem.setAttribute('x2', x2);
+      this.elem.setAttribute('y2', y2);
+    }
+
     callback();
   }
 
@@ -1700,7 +1811,9 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addPairProperty(Line, 'shrink', 'shrink1', 'shrink2', null, null, 'Shink length of line by this amount');
   sfig_.addProperty(Line, 'angle1', null, 'Starting angle');
   sfig_.addProperty(Line, 'angle2', null, 'Ending angle');
-  // TODO: stroke-linecap
+  sfig_.addProperty(Line, 'curve', null, 'Distance to curve the line (specifies a quadratic Bezier curve)');
+  sfig_.addPairProperty(Line, 'ctrlp1', 'ctrlx1', 'ctrly1', null, null, 'First control point');
+  sfig_.addPairProperty(Line, 'ctrlp2', 'ctrlx2', 'ctrly2', null, null, 'Second control point');
 
   // Rendered versions
   sfig_.addPairProperty(Line, 'realp1', 'realx1', 'realy1', null, null, 'Rendered starting point');
@@ -1930,7 +2043,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   sfig_.addProperty(Wrap, 'content', null, 'What to draw');
 
-  sfig.wrap = function(block) { return new sfig.Wrap().content(sfig.std(block)); }
+  sfig.wrap = function(block) { return new sfig.Wrap().content(block); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -2228,6 +2341,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     callback();
   };
 
+  Table.prototype.closeAppendices = function() { throw 'Not supported for tables'; }
+
   Table.prototype.center = function() { return this.justify('c', 'c'); }
   Table.prototype.xcenter = function() { return this.xjustify('c'); }
   Table.prototype.ycenter = function() { return this.yjustify('c'); }
@@ -2348,8 +2463,11 @@ sfig.defaultPrintNumColsPerPage = 2;
     var pivot = options.pivot;
     if (pivot == null) throw 'Missing pivot';
 
-    button = sfig.frame(button).bg.strokeWidth(options.borderWidth || 1).end.padding(5);
-    explanation = frame(explanation).bg.fillColor('white').strokeWidth(1).end.padding(5);
+    button = sfig.std(button);
+    if (options.borderWidth)
+      button = sfig.frame(button).bg.round(5).strokeWidth(options.borderWidth).end.padding(5);
+    explanation = frame(explanation).bg.fillColor('#F7F9D0').strokeWidth(2).end.padding(5);
+    explanation.scale(options.explanationScale || sfig.defaultExplanationScale); 
     var x, y;
     if (pivot[0] == -1) x = button.left();
     else if (pivot[0] == 1) x = button.right();
@@ -2365,7 +2483,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       else
         button.bg.elem.style.fill = 'none';
     });
-    return sfig.overlay(button, explanation);
+    return button.appendix(explanation);
   }
 
   // Set default text width based on slide width
@@ -2377,9 +2495,11 @@ sfig.defaultPrintNumColsPerPage = 2;
 
 (function() {
   // container is optional
-  var Presentation = sfig.Presentation = function() {
+  var Presentation = sfig.Presentation = function(options) {
+    if (!options) options = {};
     this.slides = [];
-    this.initKeys();
+    if (options.initKeys == null || options.initKeys)
+      this.initKeys();
   }
 
   Presentation.prototype.addSlide = function(slide) {
@@ -2393,11 +2513,10 @@ sfig.defaultPrintNumColsPerPage = 2;
       // Add notes and help
       var items = [];
       var notes = slide.notes().get();
-      if (notes) {
-        items.push(sfig.explain('Notes', std(notes).scale(1.5), {pivot: [1, -1]}));
-      }
+      if (notes)
+        items.push(sfig.explain('Notes', notes, {pivot: [1, -1], borderWidth: 1}));
       if (slide.showHelp().get())
-        items.push(sfig.explain('Help', this.getHelpBlock().scale(1.5), {pivot: [1, -1]}));
+        items.push(sfig.explain('Help', this.getHelpBlock(), {pivot: [1, -1], borderWidth: 1}));
       if (slide.rightHeader().exists())
         items.push(slide.rightHeader().get());
       if (items.length > 0)
@@ -2409,6 +2528,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     slide.state = sfig_.newState();
     slide.freeze();
+    slide.closeAppendices();
     this.slides.push(slide);
   }
 
@@ -2499,7 +2619,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
       var query = prompt('Go to which presentation (name)?');
       if (query == null) return callback();
-      sfig_.goToPresentation(query, null, null, false);
+      sfig_.goToPresentation(query, null, null, true);
     });
 
     function containsText(block, query) {
@@ -2596,6 +2716,25 @@ sfig.defaultPrintNumColsPerPage = 2;
       self.keyQueue.push(key);
       processKeyQueue(function() {});
     }, false);
+
+    // Allow scrolling to go to previous and next slide builds
+    function handleMouseWheel(event) {
+      var delta = 0;
+      if (event.wheelDelta) // IE, Opera, Chrome
+        delta = event.wheelDelta / 60;
+      else if (event.detail) // Firefox
+        delta = -event.detail / 2;
+
+      if (delta > 0) {
+        self.keyQueue.push('up');
+        processKeyQueue(function() {});
+      } else if (delta < 0) {
+        self.keyQueue.push('down');
+        processKeyQueue(function() {});
+      }
+    }
+    document.onmousewheel = handleMouseWheel;
+    document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
   }
 
   Presentation.prototype.getHelpBlock = function() {
@@ -2688,7 +2827,7 @@ sfig.defaultPrintNumColsPerPage = 2;
         var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
         var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
         var scale;
-        if (numColsPerPage == 1) scale = 0.7;
+        if (numColsPerPage == 1) scale = numRowsPerPage == 1 ? 1 : 0.7;
         else if (numColsPerPage == 2) scale = 0.4;
         else scale = 1;
         desiredWidth = width * scale;
@@ -2774,6 +2913,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   Presentation.prototype.updateUrlParams = function() {
     var self = this;
+    sfig_.urlParams.slideId = null;
     sfig_.urlParams.slideIndex = self.currSlideIndex;
     sfig_.urlParams.level = self.currLevel;
     sfig_.serializeUrlParamsToLocation();
@@ -2847,9 +2987,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     function blockToHtml(block, compressUnaries) {
       if (block instanceof sfig.Text) {
-        var div = sfig_.newElem('div');
-        div.innerHTML = block.content().get();
-        return div;
+        return sfig.Text.bulletize(block.content().get());
       } else if (block instanceof sfig.Slide) {
         return blockToHtml(block.body, compressUnaries);
       } else {
@@ -3029,24 +3167,31 @@ sfig.defaultPrintNumColsPerPage = 2;
     sfig_.initialized = true;
   }
 
+  sfig_.currPresentationName = function() {
+    return window.location.pathname.match(/\/([^\/]+)\.html/)[1];
+  }
+
   sfig_.goToPresentation = function(name, slideId, level, newWindow) {
-    sfig_.urlParams.slideIndex = null;
-    sfig_.urlParams.slideId = slideId;
-    sfig_.urlParams.level = level;
+    var urlParams = newWindow ? sfig_.mergeInto({}, sfig_.urlParams) : sfig_.urlParams;
+    urlParams.slideIndex = null;
+    urlParams.slideId = slideId;
+    urlParams.level = level;
+
     // name is the filename (without the html extension) of the sfig presentation to go to.
     var pathname = window.location.pathname.replace(/\/[^\/]+\.html/, '/'+name+'.html');
-    var urlHash = sfig_.serializeUrlParams(sfig_.urlParams);
+    var urlHash = sfig_.serializeUrlParams(urlParams);
     var url = pathname + urlHash;
     if (newWindow)
       window.open(url);
-    else
+    else {
       window.location.href = url;
+    }
   }
 
   // Create a figure from |block| and render it into |container|.
   sfig.figure = function(block, container) {
     if (typeof(container) == 'string') container = document.getElementById(container);
-    var prez = sfig.presentation();
+    var prez = sfig.presentation({initKeys: false});
     prez.addSlide(block);
     prez.displayPrinterFriendly(container);
   }
