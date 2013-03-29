@@ -20,6 +20,8 @@ function addToPrez(block) { prez.addSlide(block); }
 function testCase(block, elemStr) {
   var marker = circle(2).opacity(0.5).color('red');
   marker.onShow(function() {
+    // Uncomment this to get the SVG string to add a testCase.
+    // Currently need to manually remove "display: none".
     //console.log(sfig_.javascriptEscape(block.elemString()));
   });
   addToPrez(overlay(marker, block));
@@ -188,6 +190,7 @@ function createSlides() {
   testCase(arrow([0,0], [40,20]), '<g><g><g><g><line x1="0" y1="0" x2="40" y2="20" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g><g><g><g><g style=""></g></g></g></g><g><g><g><polygon points="0,0 -9,-3 -9,3" style="stroke: #000000; fill: #000000; stroke-width: 1px; " transform="translate(40,20) rotate(26.565051177077976,0,0)"></polygon></g></g></g></g></g>');
   testCase(overlay(c1 = circle(10), c2 = circle(10).shift(40, 20), line(c1, c2)), '<g><g><g><ellipse rx="10" ry="10" style="stroke: #000000; fill: none; stroke-width: 1px; "></ellipse></g></g><g><g><ellipse rx="10" ry="10" style="stroke: #000000; fill: none; stroke-width: 1px; " transform="translate(40,20)"></ellipse></g></g><g><g><line x1="8.94427190999916" y1="4.472135954999577" x2="31.05572809000084" y2="15.52786404500042" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g>');
   testCase(overlay(c1 = square(50), c2 = square(50).shift(40, 80), line(c1, c2)), '<g><g><g><rect width="50" height="50" style="stroke: #000000; fill: none; stroke-width: 1px; "></rect></g></g><g><g><rect width="50" height="50" style="stroke: #000000; fill: none; stroke-width: 1px; " transform="translate(40,80)"></rect></g></g><g><g><line x1="36.99999999999999" y1="49.5" x2="51.99999999999999" y2="79.5" style="stroke: #000000; fill: none; stroke-width: 1px; "></line></g></g></g>');
+  testCase(frame(sfig.polygon([0,0], [40,30], [10,50]).strokeWidth(10)).bg.strokeWidth(1).strokeColor('red').end, '<g><g style="pointer-events: all;"><g style="pointer-events: all;"><g transform="translate(-28.561511993408203,-35.57688903808594)" style="pointer-events: all;"><g style="pointer-events: all;"><g style="pointer-events: all;"><g style="pointer-events: all;"><rect width="57.12302445771385" height="71.15378057214231" style="stroke: #ff0000; fill: none; stroke-width: 1px; pointer-events: all;"></rect></g></g><g style="pointer-events: all;"><g style="pointer-events: all;"><g transform="translate(10,0)" style="pointer-events: all;"><g transform="translate(0.5,0)" style="pointer-events: all;"><g style="pointer-events: all;"></g></g></g></g></g></g></g></g><g style="pointer-events: all;"><g transform="translate(-20.59207750698306,-23.224814244665758)" style="pointer-events: all;"><polygon points="0,0 40,30 10,50" style="stroke: #000000; fill: none; stroke-width: 10px; pointer-events: all;"></polygon></g></g></g></g>');
 
   // Rooted trees
   function T() { return sfig.rootedTree.apply(null, arguments); }
