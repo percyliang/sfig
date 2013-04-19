@@ -73,6 +73,15 @@ function createSlides() {
     bulletedText('After that sentence, some math: $\\frac{3}{4}$.'),
   _));
 
+  // Fonts
+  addToPrez(slide('Fonts',
+    bulletedText('Arial').font('Arial'),
+    bulletedText('Times New Roman').font('Times New Roman'),
+    bulletedText('Courier New').font('Courier New'),
+    bulletedText('Computer Modern').font('Computer Modern'),
+    bulletedText('Noto Sans').font('Noto Sans'),
+  _));
+
   // Javascript create objects
   (function() {
     var o = wrap('?');

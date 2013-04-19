@@ -2370,7 +2370,11 @@ sfig.defaultPrintNumColsPerPage = 2;
     callback();
   };
 
-  Table.prototype.closeAppendices = function() { throw 'Not supported for tables'; }
+  Table.prototype.closeAppendices = function() {
+    this.freeze();
+    // Just don't do anything
+    //throw 'Not supported for tables';
+  }
 
   Table.prototype.center = function() { return this.justify('c', 'c'); }
   Table.prototype.xcenter = function() { return this.xjustify('c'); }
@@ -3195,7 +3199,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       //   - normal: works great, except when we print from this, the text is completely mis-aligned.
       //   - jax=SVG: only needed for printing.
       if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
-      buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js"],';
+      buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
       buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
       buf += '  TeX: { Macros: {';
       for (var name in sfig_.latexMacros) {

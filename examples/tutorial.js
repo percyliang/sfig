@@ -39,7 +39,7 @@ prez.addSlide(slide('',
   example("circle(20).color('blue')", {numRows: 4}),
   'You can edit the Javascript code (e.g., try changing the color to red) and press ctrl-enter to see the updated result.',
   'Use the arrow keys to move between slides.  Press \'?\' for help.',
-  text('Download the code on GitHub.').linkToUrl('http://github.com/percyliang/sfig'),
+  text('Download the code from GitHub.'.fontcolor('blue')).linkToUrl('http://github.com/percyliang/sfig'),
 _).id('title'));
 
 add(slide('Why sfig?',
