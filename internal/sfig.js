@@ -67,7 +67,10 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   // Shorthand methods for debugging
   sfig.L = function() {
-    console.log(arguments);
+    if (arguments.length == 1)
+      console.log(arguments[0]);
+    else
+      console.log(arguments);
   }
   sfig.S = function(x) {
     if (x instanceof SVGRect) return sfig_.rectToString(x);
@@ -828,6 +831,8 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addDerivedProperty(Block, 'bottom', function(a, b) { return a + b; }, ['top', 'realHeight'], 'Bottom coordinate');
   sfig_.addDerivedProperty(Block, 'xmiddle', function(a, b) { return a + b/2; }, ['left', 'realWidth'], 'Middle x-coordinate');
   sfig_.addDerivedProperty(Block, 'ymiddle', function(a, b) { return a + b/2; }, ['top', 'realHeight'], 'Middle y-coordinate');
+
+  Block.prototype.middle = function() { return [this.xmiddle(), this.ymiddle()]; }
 
   // Return the point of where a ray from the center leaving with given angle would intersect
   // the boundaries.  By default, assume rectangular boundaries.
@@ -1698,8 +1703,10 @@ sfig.defaultPrintNumColsPerPage = 2;
   ArrowHead.prototype.createChildren = function() {
     var width = this.width().getOrElse(sfig.defaultArrowWidth);
     var length = this.length().getOrElse(sfig.defaultArrowLength);
-    var e = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Adjust for stroke size
+    var s = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth);
+    var e = s * 1.5;  // Adjust for stroke size
     var poly = sfig.polygon([-e,0], [-length-e, -width/2], [-length-e, +width/2]);
+    poly.strokeWidth(s);
     poly.rotate(this.angle());
     poly.shift(this.xtip(), this.ytip());
     this.addChild(poly);
@@ -1931,8 +1938,68 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   Poly.prototype.renderElem = function(state, callback) {
     var elem = sfig_.newSvgElem(this.closed().get() ? 'polygon' : 'polyline');
-    elem.setAttribute('points', this.points().getOrDie().map(function(p) { return p.join(','); }).join(' '));
+    var points = this.points().getOrDie();
+    points = points.map(function(p) {
+      var x = p[0];
+      var y = p[1];
+      if (x instanceof sfig.Thunk) x = x.get();
+      if (y instanceof sfig.Thunk) y = y.get();
+      return [x,y];
+    });
+    elem.setAttribute('points', points.map(function(p) {return p[0]+','+p[1];}).join(' '));
     this.elem = elem;
+
+    // For non-rectangular polygons, we have to compute our own bounding box
+    // because the amount by which the strokeWidth spills out of the bounding
+    // box depends on the angles of the polygon.
+    // Not very efficient.
+    if (points.length >= 3) {
+      var minx = null, miny = null, maxx = null, maxy = null;
+      var strokeWidth = this.strokeWidth().get();
+      for (var i = 0; i < points.length; i++) {
+        var p1 = points[i];
+        var p2 = points[(i+1) % points.length];
+        var p3 = points[(i+2) % points.length];
+        //     q2
+        //     ||
+        //   w || len
+        //     ||
+        //     p2 
+        //  u /||\ v
+        //   / ||a\
+        // p1  ||  \
+        //          p3
+        // Compute angle 
+        var ux = p1[0] - p2[0];
+        var uy = p1[1] - p2[1];
+        var vx = p3[0] - p2[0];
+        var vy = p3[1] - p2[1];
+        var u_mag = Math.sqrt(ux*ux + uy*uy); ux /= u_mag; uy /= u_mag;
+        var v_mag = Math.sqrt(vx*vx + vy*vy); vx /= v_mag; vy /= v_mag;
+        if (!(u_mag > 0) || !(v_mag > 0)) throw 'Duplicate points: '+u_mag+' '+v_mag;
+        var cos_2a = ux*vx + uy*vy;
+        var sin_a = Math.sin(Math.acos(cos_2a)/2);
+        if (sin_a == 0) throw 'Collinear points';
+        var len = (strokeWidth/2) / sin_a;  // How much to extend p2 -> q2
+        //sfig.L(strokeWidth/2, Math.acos(cos_2a)*180/Math.PI/2, len);
+        // w is direction to grow
+        var wx = (ux + vx)/2;
+        var wy = (uy + vy)/2;
+        var w_mag = Math.sqrt(wx*wx + wy*wy); wx /= w_mag; wy /= w_mag;
+        var q2x = p2[0] - wx*len;
+        var q2y = p2[1] - wy*len;
+        if (minx == null || q2x < minx) minx = q2x;
+        if (miny == null || q2y < miny) miny = q2y;
+        if (maxx == null || q2x > maxx) maxx = q2x;
+        if (maxy == null || q2y > maxy) maxy = q2y;
+      }
+      this.left(minx);
+      this.top(miny);
+      this.realWidth(maxx-minx);
+      this.realHeight(maxy-miny);
+      this.bboxIsSet = true;
+    }
+
     callback();
   }
 
@@ -2306,6 +2373,8 @@ sfig.defaultPrintNumColsPerPage = 2;
   Table.prototype.closeAppendices = function() { throw 'Not supported for tables'; }
 
   Table.prototype.center = function() { return this.justify('c', 'c'); }
+  Table.prototype.xcenter = function() { return this.xjustify('c'); }
+  Table.prototype.ycenter = function() { return this.yjustify('c'); }
   sfig_.addPairProperty(Table, 'justify', 'xjustify', 'yjustify', null, null, 'Justification string consisting of l (left), c (center), or r (right)');
   sfig_.addPairProperty(Table, 'margin', 'xmargin', 'ymargin', null, null, 'Amount of space between rows/columns');
   sfig_.addPairProperty(Table, 'cellDim', 'cellWidth', 'cellHeight', null, null, 'Set the dimensions of cells');
@@ -3084,6 +3153,11 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (sfig_.initialized) throw 'Can\'t add Latex macros after initialized';
     sfig_.latexMacros[name] = [arity, body];
   }
+
+  // Some default ones
+  sfig.latexMacro('red', 1, '\\color{red}{#1}');
+  sfig.latexMacro('blue', 1, '\\color{blue}{#1}');
+  sfig.latexMacro('green', 1, '\\color{green}{#1}');
 
   sfig_.includeScript = function(src) {
     var head = document.head;
