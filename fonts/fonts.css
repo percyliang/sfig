@@ -1,11 +1,21 @@
-/* From TeX */
-@font-face {
-  font-family: "Computer Modern";
-  src: url('cmss10.ttf');
-}
-
 /* From Google Web Fonts */
 @font-face {
   font-family: "Noto Sans";
   src: url('NotoSans-Regular.ttf');
+}
+@font-face {
+  font-family: "Noto Sans";
+  src: url('NotoSans-Bold.ttf');
+  font-weight: bold;
+}
+@font-face {
+  font-family: "Noto Sans";
+  src: url('NotoSans-Italic.ttf');
+  font-style: italic;
+}
+@font-face {
+  font-family: "Noto Sans";
+  src: url('NotoSans-BoldItalic.ttf');
+  font-weight: bold;
+  font-style: italic;
 }

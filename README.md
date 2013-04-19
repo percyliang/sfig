@@ -21,7 +21,10 @@ In any sfig presentation, you can press '?' for help.
 
 Currently, sfig has been tested with Chrome 21 and Firefox 15 on Linux and both
 work, although the math and animations work much better in Firefox due to a bug
-in Chrome.
+in Chrome (Webkit, specifically).
+
+In Firefox, to load MathJax fonts properly from local disk, go to about:config
+and set security.fileuri.strict\_origin\_policy to false.
 
 ------------------------------------------------------------
 (C) Copyright 2012, Percy Liang
