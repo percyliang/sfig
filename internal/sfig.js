@@ -58,6 +58,9 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig.resetCursor = function() {
     document.documentElement.style.cursor = sfig.defaultCursor;
   }
+  sfig.hideCursor = function() {
+    document.documentElement.style.cursor = 'none';
+  }
   sfig.setLaserPointerCursor = function() {
     sfig.defaultCursor = 'url("'+sfig.getInternalDir()+'/../images/red-dot.png"), auto';
     sfig.resetCursor();
@@ -2744,10 +2747,15 @@ sfig.defaultPrintNumColsPerPage = 2;
       }
     }
     document.documentElement.addEventListener('keydown', function(event) {
+      sfig.hideCursor();
       if (!sfig_.keysEnabled) return;
       var key = sfig_.eventToKey(event);
       self.keyQueue.push(key);
       processKeyQueue(function() {});
+    }, false);
+
+    document.documentElement.addEventListener('mousemove', function(event) {
+      sfig.resetCursor();
     }, false);
 
     // Allow scrolling to go to previous and next slide builds
