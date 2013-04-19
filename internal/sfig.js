@@ -2302,6 +2302,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       totalWidth += xmargin * (this.numCols - 1);
       for (var c = 0; c < this.numCols; c++) totalWidth += widths[c];
       var extraWidth = (this.width().getOrElse(totalWidth) - totalWidth) / this.numCols;
+      if (extraWidth < 0) extraWidth = 0;
       for (var c = 0; c < this.numCols; c++) widths[c] += extraWidth;
       totalWidth += extraWidth;
     }
@@ -2311,6 +2312,7 @@ sfig.defaultPrintNumColsPerPage = 2;
       totalHeight += ymargin * (this.numRows - 1);
       for (var r = 0; r < this.numRows; r++) totalHeight += heights[r];
       var extraHeight = (this.height().getOrElse(totalHeight) - totalHeight) / this.numRows;
+      if (extraHeight < 0) extraHeight = 0;
       for (var r = 0; r < this.numRows; r++) heights[r] += extraHeight;
       totalHeight += extraHeight;
     }
