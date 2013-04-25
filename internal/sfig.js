@@ -1535,7 +1535,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var content = this.content().get();
 
     var text;
-    if (numRows == 1 /*this.multiline().get()*/) {
+    if (!this.multiline().get()) {
       text = sfig_.newElem('input');
       text.type = 'text';
       text.size = numCols;
@@ -1547,6 +1547,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       text.cols = numCols;
       if (content) text.appendChild(document.createTextNode(content));
     }
+    text.style.fontSize = this.fontSize().getOrDie();
 
     text.onfocus = function() {
       sfig_.keysEnabled = false;
@@ -1610,6 +1611,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addPairProperty(TextBox, 'selection', 'selectionStart', 'selectionEnd', 0, 0, 'Where the cursor is');
   sfig_.addProperty(TextBox, 'multiline', null, 'Whether to use textarea (rather than input text)');
 
+  sfig_.addProperty(TextBox, 'fontSize', 28, 'Font size to use to display the text.');
   sfig_.addProperty(TextBox, 'onChange', null, 'Function to call when the content changes.');
   sfig_.addProperty(TextBox, 'onEnter', null, 'Function to call when enter is pressed.');
 
