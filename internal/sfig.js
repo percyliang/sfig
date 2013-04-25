@@ -1,8 +1,19 @@
 // sfig: SVG/Javascript-based library for creating presentation/figures.
-// Percy Liang
+// This file contains all the core utilities needed to run fig.
+// @author Percy Liang
 
 var sfig = {}; // Namespace of public members.
 var sfig_ = {}; // Namespace of private members.
+
+// 
+// for node.js: make sfig and sfig_ accessible by everyone.
+if (typeof global != 'undefined') {
+  global.sfig = sfig;
+  global.sfig_ = sfig_;
+  sfig.serverSide = true;
+} else {
+  sfig.serverSide = false;
+}
 
 ////////////////////////////////////////////////////////////
 // Default parameters which can be overridden.
@@ -23,6 +34,13 @@ sfig.enableMouseWheel = true;  // Whether allow mouse wheel to scroll
 
 sfig.defaultPrintNumRowsPerPage = 3;
 sfig.defaultPrintNumColsPerPage = 2;
+
+// In SVG, down is increasing y (sfig.serverSide = false)
+// In Metapost, down is increasing y (sfig.serverSide = true).
+if (!sfig.serverSide) sfig.downSign = 1;  // SVG
+else sfig.downSign = -1;  // Metapost
+sfig.up = function(x) { return -x * sfig.downSign; };
+sfig.down = function(x) { return x * sfig.downSign; };
 
 ////////////////////////////////////////////////////////////
 // Simple functions
@@ -67,6 +85,10 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   sfig.identity = function(x) { return x; };
+
+  sfig.isNumber = function(x) { return typeof(x) == 'number'; }
+  sfig.isString = function(x) { return typeof(x) == 'string'; }
+  sfig.isFunction = function(x) { return typeof(x) == 'function'; }
 
   // Shorthand methods for debugging
   sfig.L = function() {
@@ -124,7 +146,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     if (item instanceof sfig.Block) return item;
     if (item instanceof sfig.AuxiliaryInfo) return item;
     if (item instanceof sfig.PropertyChanger) return item;
-    if (item instanceof HTMLElement) return sfig.text(item);
+    if (typeof HTMLElement != 'undefined' && item instanceof HTMLElement) return sfig.text(item);
     var type = typeof(item);
     if (type == 'string') return sfig.text(item);
     if (type == 'number') return sfig.text(''+item);  // Convert strings and numbers to text
@@ -147,6 +169,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.newElem = function(type) { return document.createElement(type); }
   sfig_.svgns = 'http://www.w3.org/2000/svg';
   sfig_.newSvgElem = function(type) {
+    if (typeof document == 'undefined') return null;
     return document.createElementNS(sfig_.svgns, type);
   }
   sfig_.newSvg = function() {
@@ -489,27 +512,35 @@ sfig.defaultPrintNumColsPerPage = 2;
   var apply = function(x, f) { return x == null || f == null ? null : f(x); }
   Thunk.prototype.apply = function(f) { return tfunc('apply', apply, [this, f]); }
 
-  var add = function(a, b) { return a == null || b == null ? null : a + b; }
-  var sub = function(a, b) { return a == null || b == null ? null : a - b; }
-  var mul = function(a, b) { return a == null || b == null ? null : a * b; }
-  var div = function(a, b) { return a == null || b == null ? null : a / b; }
-  var min = sfig_.robustMin;
-  var max = sfig_.robustMax;
-  var and = function(a, b) { return a && b; }
-  var or = function(a, b) { return a || b; }
-  var not = function(a) { return !a; }
-  var cond = function(test, a, b) { return test ? a : b; } // Note: in Javascript, null, false, 0, '' are all false
+  // Can override if needed.
+  Thunk.add = function(a, b) { return a == null || b == null ? null : a + b; }
+  Thunk.sub = function(a, b) { return a == null || b == null ? null : a - b; }
+  Thunk.mul = function(a, b) { return a == null || b == null ? null : a * b; }
+  Thunk.div = function(a, b) { return a == null || b == null ? null : a / b; }
+  Thunk.min = sfig_.robustMin;
+  Thunk.max = sfig_.robustMax;
+  Thunk.and = function(a, b) { return a && b; }
+  Thunk.or = function(a, b) { return a || b; }
+  Thunk.not = function(a) { return !a; }
+  Thunk.cond = function(test, a, b) { return test ? a : b; } // Note: in Javascript, null, false, 0, '' are all false
 
-  Thunk.prototype.add = function(x) { return tfunc('add', add, [this, x]); }
-  Thunk.prototype.sub = function(x) { return tfunc('sub', sub, [this, x]); }
-  Thunk.prototype.mul = function(x) { return tfunc('mul', mul, [this, x]); }
-  Thunk.prototype.div = function(x) { return tfunc('div', div, [this, x]); }
-  Thunk.prototype.min = function(x) { return tfunc('min', min, [this, x]); }
-  Thunk.prototype.max = function(x) { return tfunc('max', max, [this, x]); }
-  Thunk.prototype.and = function(x) { return tfunc('and', and, [this, x]); }
-  Thunk.prototype.or = function(x) { return tfunc('or', or, [this, x]); }
-  Thunk.prototype.not = function() { return tfunc('not', not, [this]); }
-  Thunk.prototype.cond = function(a, b) { return tfunc('not', cond, [this, a, b]); }
+  Thunk.addHalf = function(a, b) { return a == null || b == null ? null : a + b/2; }
+  Thunk.up = function(a, b) { return a == null || b == null ? null : a - b * sfig.downSign; }
+  Thunk.down = function(a, b) { return a == null || b == null ? null : a + b * sfig.downSign; }
+  Thunk.downHalf = function(a, b) { return a == null || b == null ? null : a + b/2 * sfig.downSign; }
+
+  Thunk.prototype.add = function(x) { return tfunc('add', Thunk.add, [this, x]); }
+  Thunk.prototype.sub = function(x) { return tfunc('sub', Thunk.sub, [this, x]); }
+  Thunk.prototype.mul = function(x) { return tfunc('mul', Thunk.mul, [this, x]); }
+  Thunk.prototype.div = function(x) { return tfunc('div', Thunk.div, [this, x]); }
+  Thunk.prototype.min = function(x) { return tfunc('min', Thunk.min, [this, x]); }
+  Thunk.prototype.max = function(x) { return tfunc('max', Thunk.max, [this, x]); }
+  Thunk.prototype.and = function(x) { return tfunc('and', Thunk.and, [this, x]); }
+  Thunk.prototype.or = function(x) { return tfunc('or', Thunk.or, [this, x]); }
+  Thunk.prototype.not = function() { return tfunc('not', Thunk.not, [this]); }
+  Thunk.prototype.cond = function(a, b) { return tfunc('not', Thunk.cond, [this, a, b]); }
+  Thunk.prototype.up = function(x) { return tfunc('div', Thunk.up, [this, x]); }
+  Thunk.prototype.down = function(x) { return tfunc('div', Thunk.down, [this, x]); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -650,11 +681,17 @@ sfig.defaultPrintNumColsPerPage = 2;
         throw 'Derived property '+name+' is read-only, unable to set to '+Array.prototype.slice.call(arguments);
       var v = this.properties[name];
       if (v == null) {
+        // Compute and cache the result.
         var self = this;
         v = this.properties[name] = sfig.tfunc(name, func, argNames.map(function(argName) { return self[argName](); }));
       }
       return v;
     }
+  }
+
+  sfig_.removeProperty = function(constructor, name) {
+    if (!constructor.prototype[name]) throw constructor.prototype.className+' doesn\'t have property '+name;
+    delete constructor.prototype[name];
   }
 })();
 
@@ -777,6 +814,8 @@ sfig.defaultPrintNumColsPerPage = 2;
     return this;
   }
 
+  sfig_.addProperty(Block, 'id', null, 'Identifier of the slide');
+
   sfig_.addProperty(Animate, 'duration', '1s', 'Time to spend performing the animation');
   sfig_.addProperty(Block, 'replace', null, 'Object to hide when this object is shown.');
 
@@ -784,6 +823,20 @@ sfig.defaultPrintNumColsPerPage = 2;
   [Block, Animate].forEach(function(constructor) {
     sfig_.addPairProperty(constructor, 'shift', 'xshift', 'yshift', null, null, 'Move object by this distance.');
     sfig_.addPairProperty(constructor, 'scale', 'xscale', 'yscale', null, null, 'Change size by this factor.');
+
+    // shift(x, y) takes absolute positions (make the transformation (0, 0) => (x, y))
+    // shiftBy(dx, dy) takes relative positions (dx value is amount to move right, dy value is amount to move down)
+    if (sfig.downSign == 1) {
+      // SVG
+      constructor.prototype.shiftBy = constructor.prototype.shift;
+      constructor.prototype.xshiftBy = constructor.prototype.xshift;
+      constructor.prototype.yshiftBy = constructor.prototype.yshift;
+    } else {
+      // Metapost
+      constructor.prototype.shiftBy = function(dx, dy) { return this.shift(dx, dy instanceof sfig.Thunk ? dy.mul(sfig.downSign) : dy * sfig.downSign); }
+      constructor.prototype.xshiftBy = constructor.prototype.xshift;
+      constructor.prototype.yshiftBy = function(dy) { return this.yshift(dy instanceof sfig.Thunk ? dy.mul(sfig.downSign) : dy * sfig.downSign); }
+    }
 
     sfig_.addProperty(constructor, 'rotate', null, 'Number of degrees to rotate clockwise.');
     sfig_.addPairProperty(constructor, 'rotatePivot', 'xrotatePivot', 'yrotatePivot', null, null, 'Rotate around this point.');
@@ -830,10 +883,10 @@ sfig.defaultPrintNumColsPerPage = 2;
   // box).
   sfig_.addPairProperty(Block, 'realDim', 'realWidth', 'realHeight', null, null, 'Dimensions of the actual rendered object');
   sfig_.addPairProperty(Block, 'leftTop', 'left', 'top', null, null, 'Top-left corner');
-  sfig_.addDerivedProperty(Block, 'right', function(a, b) { return a + b; }, ['left', 'realWidth'], 'Right coordinate');
-  sfig_.addDerivedProperty(Block, 'bottom', function(a, b) { return a + b; }, ['top', 'realHeight'], 'Bottom coordinate');
-  sfig_.addDerivedProperty(Block, 'xmiddle', function(a, b) { return a + b/2; }, ['left', 'realWidth'], 'Middle x-coordinate');
-  sfig_.addDerivedProperty(Block, 'ymiddle', function(a, b) { return a + b/2; }, ['top', 'realHeight'], 'Middle y-coordinate');
+  sfig_.addDerivedProperty(Block, 'right', sfig.Thunk.add, ['left', 'realWidth'], 'Right coordinate');
+  sfig_.addDerivedProperty(Block, 'bottom', sfig.Thunk.add, ['top', 'realHeight'], 'Bottom coordinate');
+  sfig_.addDerivedProperty(Block, 'xmiddle', sfig.Thunk.addHalf, ['left', 'realWidth'], 'Middle x-coordinate');
+  sfig_.addDerivedProperty(Block, 'ymiddle', sfig.Thunk.addHalf, ['top', 'realHeight'], 'Middle y-coordinate');
 
   Block.prototype.middle = function() { return [this.xmiddle(), this.ymiddle()]; }
 
@@ -1212,13 +1265,24 @@ sfig.defaultPrintNumColsPerPage = 2;
     }
 
     this.addAnimations(this.elem);
+    this.addToLevelIndices(state);
+  }
 
+  Block.prototype.addToLevelIndices = function(state) {
     // Index level to this element so we can quickly show/hide as we change levels.
     var showLevel = this.showLevel().get();
     var hideLevel = this.hideLevel().get();
-    if (this.hasAnimation) sfig_.vectorPushInto(state.animateBlocks, showLevel, this);
-    if (showLevel != -1) sfig_.vectorPushInto(state.showBlocks, showLevel, this);
-    if (hideLevel != -1) sfig_.vectorPushInto(state.hideBlocks, hideLevel, this);
+    if (showLevel != null) {
+      if (!sfig.isNumber(showLevel)) throw 'showLevel is not a number: ' + showLevel;
+      if (showLevel != -1) {
+        sfig_.vectorPushInto(state.showBlocks, showLevel, this);
+        if (this.hasAnimation) sfig_.vectorPushInto(state.animateBlocks, showLevel, this);
+      }
+    }
+    if (hideLevel != null) {
+      if (!sfig.isNumber(hideLevel)) throw 'hideLevel is not a number: ' + hideLevel;
+      if (hideLevel != -1) sfig_.vectorPushInto(state.hideBlocks, hideLevel, this);
+    }
   }
 
   // Called (either manually or automatically) when we're done setting properties.
@@ -1257,7 +1321,7 @@ sfig.defaultPrintNumColsPerPage = 2;
         i++;
       }
 
-      if (i == blocks.length) return callback();
+      if (i == blocks.length) { callback(); return; }
       var block = blocks[i];
       if (stage == 0) {  // First render...
         stage = 1;
@@ -1372,8 +1436,10 @@ sfig.defaultPrintNumColsPerPage = 2;
     return sfig_.ensureHTMLElement(content);
   }
 
-  // Due to MathJax, renderElem doesn't callback.
-  Text.prototype.renderUsesCallback = true;
+  // Due to MathJax, renderElem needs to use the callback.
+  Text.prototype.renderUsesCallback = sfig.enableMath;
+
+  Text.fontsLoaded = false;
 
   Text.prototype.renderElem = function(state, callback) {
     var self = this;
@@ -1388,7 +1454,7 @@ sfig.defaultPrintNumColsPerPage = 2;
     div.style.fontSize = this.fontSize().getOrDie();
     var content = this.content().getOrDie();
     if (this.bulleted().get()) {
-      if (typeof(content) == 'string') content = [null, content];
+      if (sfig.isString(content)) content = [null, content];
       content = Text.bulletize(content);
     }
     div.appendChild(sfig_.ensureHTMLElement(content));
@@ -1399,12 +1465,13 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     // Put div in foreignObject for SVG
     var elem = sfig_.newSvgElem('foreignObject');
-    elem.setAttribute('width', this.width().getOrElse(1000000));
+    elem.setAttribute('width', this.autowrap().getOrElse(true) ? this.width().get() : 1000000);
     elem.setAttribute('height', 1000000);
     elem.appendChild(div);
-    state.svg.appendChild(elem);  // Add to just get the size
+    state.svg.appendChild(elem);  // Add temporarily to the root SVG to just get the size of this text
 
-    function finish() {
+    function fontsLoaded() {
+      Text.fontsLoaded = true;
       var fudge = 1; // Firefox needs +1
       // BUG: Chrome doesn't render $G$ properly
       elem.setAttribute('width', div.offsetWidth + fudge);
@@ -1413,26 +1480,40 @@ sfig.defaultPrintNumColsPerPage = 2;
       callback();
     }
 
+    function finish() {
+      if (Text.fontsLoaded) {
+        fontsLoaded();
+      } else {
+        // In Chrome, it takes a while for fonts to load, so the dimensions are
+        // not computed with the correct fonts.  Hack: wait a while for fonts
+        // to load.  Firefox doesn't have this problem.
+        setTimeout(fontsLoaded, 5);
+      }
+    }
+
     if (sfig.enableMath)
       MathJax.Hub.queue.Push(['Typeset', MathJax.Hub, div], finish);
-      //MathJax.Hub.queue.Push(function() { MathJax.Hub.Typeset(div, finish); });
     else
       finish();
   }
 
   sfig_.addProperty(Text, 'content', null, 'The string to be displayed.');
-  sfig_.addProperty(Text, 'font', 'Times New Roman', 'Font to use to display the text.');
+  sfig_.addProperty(Text, 'font', 'Noto Sans', 'Font to use to display the text.');
   sfig_.addProperty(Text, 'fontSize', 28, 'Font size to use to display the text.');
-  sfig_.addProperty(Text, 'width', null, 'Affects wrapping');
+  sfig_.addProperty(Text, 'width', null, 'Affects wrapping (default: Slide width)');
   sfig_.addProperty(Text, 'bulleted', null, 'Whether to prepend a bullet');
 
-  Text.prototype.noWrap = function() { return this.width(1000000); }
+  // By default, sfig tries to figure out if autowrap is needed.
+  sfig_.addProperty(Text, 'autowrap', null, 'Whether to autowrap text at the specified width');
+
   // only scale font down, not the width
   //Text.prototype.scaleFont = function(s) { return this.fontSize(Math.round(this.fontSize().get() / s)); }
+  // Make font smaller, but keep the width the same
   Text.prototype.scaleFont = function(s) { return this.scale(s).width(Text.defaults.getProperty('width').get() / s); }
 
   sfig.text = function(content) { return new Text().content(content); }
   sfig.bulletedText = function(content) { return sfig.text(content).bulleted(true); }
+  sfig.nowrapText = function(content) { return sfig.text(content).autowrap(false); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1629,17 +1710,47 @@ sfig.defaultPrintNumColsPerPage = 2;
       elem.setAttribute('height', this.height().getOrDie());
       elem.appendChild(div);
       this.elem = elem;
+      callback();
     } else {
-      var elem = sfig_.newSvgElem('image');
-      elem.setAttributeNS('http://www.w3.org/1999/xlink', 'href', this.href().getOrDie());
-      elem.setAttribute('width', this.width().getOrDie());
-      elem.setAttribute('height', this.height().getOrDie());
-      this.elem = elem;
+      var path = this.href().getOrDie();
+      // Load the image to figure out how big it is.
+      img = new window.Image();
+      img.src = path;
+      var self = this;
+      img.onload = function() {
+        var dim = self.computeDesiredDim(img.width, img.height);
+        var elem = sfig_.newSvgElem('image');
+        elem.setAttributeNS('http://www.w3.org/1999/xlink', 'href', path);
+        elem.setAttribute('width', dim[0]);
+        elem.setAttribute('height', dim[1]);
+        self.elem = elem;
+        callback();
+      };
     }
-    callback();
   }
+  Image.prototype.renderUsesCallback = true;  // Needed to compute the size of images
+
   sfig_.addProperty(Image, 'href', null, 'URL of the image to be loaded');
-  sfig_.addPairProperty(Image, 'dim', 'width', 'height', null, null, 'Dimensions of rectangle');
+  sfig_.addPairProperty(Image, 'dim', 'width', 'height', null, null, 'Dimensions of bounding box (optionally specify any/none of the values to override)');
+
+  // Given the original width and height of image and information about the
+  // desired width/height specified on this Image, return the actual
+  // width/height to use.
+  Image.prototype.computeDesiredDim = function(origWidth, origHeight) {
+    // Preserve aspect ratio if only one of 
+    var aspectRatio = origWidth / origHeight;
+    var width = this.width().get();
+    var height = this.height().get();
+    if (width == null && height == null) {
+      width = origWidth;
+      height = origHeight;
+    } else if (width == null) {
+      width = Math.ceil(height * aspectRatio);
+    } else if (height == null) {
+      height = Math.ceil(width / aspectRatio);
+    }
+    return [width, height];
+  }
 
   sfig.image = function(href) { return new Image().href(href); }
 
@@ -1924,10 +2035,10 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   sfig.leftArrow = function(n) { return sfig.arrow([0, 0], [-n, 0]); }
   sfig.rightArrow = function(n) { return sfig.arrow([0, 0], [n, 0]); }
-  sfig.upArrow = function(n) { return sfig.arrow([0, 0], [0, -n]); }
-  sfig.downArrow = function(n) { return sfig.arrow([0, 0], [0, n]); }
+  sfig.upArrow = function(n) { return sfig.arrow([0, 0], [0, sfig.up(n)]); }
+  sfig.downArrow = function(n) { return sfig.arrow([0, 0], [0, sfig.down(n)]); }
   sfig.leftRightArrow = function(n) { return sfig.doubleArrow([0, 0], [n, 0]); }
-  sfig.upDownArrow = function(n) { return sfig.doubleArrow([0, 0], [0, n]); }
+  sfig.upDownArrow = function(n) { return sfig.doubleArrow([0, 0], [0, sfig.down(n)]); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1939,8 +2050,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   };
   sfig_.inheritsFrom('Poly', Poly, sfig.Block);
 
-  Poly.prototype.renderElem = function(state, callback) {
-    var elem = sfig_.newSvgElem(this.closed().get() ? 'polygon' : 'polyline');
+  Poly.prototype.getPoints = function() {
     var points = this.points().getOrDie();
     points = points.map(function(p) {
       var x = p[0];
@@ -1949,6 +2059,12 @@ sfig.defaultPrintNumColsPerPage = 2;
       if (y instanceof sfig.Thunk) y = y.get();
       return [x,y];
     });
+    return points;
+  }
+
+  Poly.prototype.renderElem = function(state, callback) {
+    var elem = sfig_.newSvgElem(this.closed().get() ? 'polygon' : 'polyline');
+    var points = this.getPoints();
     elem.setAttribute('points', points.map(function(p) {return p[0]+','+p[1];}).join(' '));
     this.elem = elem;
 
@@ -2118,7 +2234,6 @@ sfig.defaultPrintNumColsPerPage = 2;
     var xscale = this.width().andThen(this.width().div(this.content.realWidth()));
     var yscale = this.height().andThen(this.height().div(this.content.realHeight()));
     wrapped.scale(xscale.min(yscale));  // Preserve aspect ratio
-    //wrapped.scale(xscale.orElse(yscale), yscale.orElse(xscale));
 
     this.addChild(wrapped);
   }
@@ -2167,7 +2282,8 @@ sfig.defaultPrintNumColsPerPage = 2;
 })();
 
 ////////////////////////////////////////////////////////////
-// Frame: an object overlaid on a rectangular background |bg|.
+// Frame: |content| is placed on a rectangular background |bg|,
+// whose dimensions are determined based on content.
 
 (function() {
   var Frame = sfig.Frame = function(content) {
@@ -2180,7 +2296,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
     var bgWithTitle = sfig.overlay(
       this.bg,  // Rectangular background
-      transform(this.titleBlock).pivot(-1, 0).xshift(10),  // Title
+      sfig.transform(this.titleBlock).pivot(-1, 0).xshiftBy(10),  // Title
     _);
     this.overlay = sfig.overlay(bgWithTitle, this.content);
     this.overlay.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
@@ -2409,10 +2525,12 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
 
   Slide.prototype.createChildren = function() {
-    this.titleBlock = this.title().getOrElse('');
-    if (!(this.titleBlock instanceof sfig.Block))
-      this.titleBlock = sfig.text(this.titleBlock).strokeColor(this.titleColor());
-    this.titleBlock.setEnd(this);
+    this.titleBlock = this.title().get();
+    if (this.titleBlock != null) {
+      if (!(this.titleBlock instanceof sfig.Block))
+        this.titleBlock = sfig.text(this.titleBlock).strokeColor(this.titleColor());
+      this.titleBlock.setEnd(this);
+    }
 
     var _ = sfig._;
 
@@ -2428,24 +2546,28 @@ sfig.defaultPrintNumColsPerPage = 2;
     //       | ...           |   |
     //       +               +   +
 
-    // Combine title and body
-    var titleBlock = sfig.frame(sfig.wrap(this.titleBlock).scale(this.titleScale())).pivot(0, 1).bg.strokeWidth(0).dim(this.innerWidth(), this.titleHeight()).end;
-    var titleBody = sfig.ytable(
-      titleBlock,
-      this.body,
-    _).ymargin(this.titleSpacing()).shift(this.leftPadding(), this.topPadding());
-
+    // Add border
     var border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
-
     this.addChild(border);
 
+    // Combine title and body
+    var framedTitleBlock = _;
+    if (this.titleBlock != null) {
+      framedTitleBlock = sfig.frame(
+        sfig.wrap(this.titleBlock).scale(this.titleScale()),
+      _).pivot(0, 1).bg.strokeWidth(0).dim(this.innerWidth(), this.titleHeight()).end;
+    }
+    var titleBody = sfig.ytable(
+      framedTitleBlock,
+      this.body,
+    _).ymargin(this.titleSpacing()).shiftBy(this.leftPadding(), this.topPadding());
     this.addChild(titleBody);
 
     // Add headers and footers
-    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shift(this.headerPadding(), this.headerPadding()).scale(this.headerScale()).showLevel(0));
-    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shift(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()).showLevel(0));
-    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shift(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
-    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shift(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shiftBy(this.headerPadding(), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shiftBy(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shiftBy(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shiftBy(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
 
     var extra = this.extra().get();
     if (extra != null) this.addChild(sfig.std(extra));
@@ -2479,19 +2601,17 @@ sfig.defaultPrintNumColsPerPage = 2;
   sfig_.addDerivedProperty(Slide, 'innerHeight', removePadding, ['height', 'topPadding', 'bottomPadding'], 'Dimensions minus padding.');
   sfig_.addDerivedProperty(Slide, 'bodyHeight', removePadding, ['innerHeight', 'titleHeight', 'titleSpacing'], 'Dimensions minus padding.');
 
-  sfig_.addProperty(Slide, 'id', null, 'Identifier of the slide');
-
   sfig_.addProperty(Slide, 'notes', null, 'Identifier of the slide');
   sfig_.addProperty(Slide, 'showHelp', false, 'Whether to show help');
   sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices');
   sfig_.addProperty(Slide, 'extra', null, 'Object to overlay on top of the slide');
 
+  // Usage: slide(title, ...); if title is null, then don't allocate any space for it.
   sfig.slide = function() {
     var title = arguments[0];
     var contents = Array.prototype.slice.call(arguments, 1);
     var slide = new Slide(contents);
     if (title != null) slide.title(title);
-    else slide.titleHeight(0).titleSpacing(0);  // No title - plain slide
     return slide;
   }
 
@@ -2536,7 +2656,7 @@ sfig.defaultPrintNumColsPerPage = 2;
   var Presentation = sfig.Presentation = function(options) {
     if (!options) options = {};
     this.slides = [];
-    if (options.initKeys == null || options.initKeys)
+    if (!sfig.serverSide && (options.initKeys == null || options.initKeys))
       this.initKeys();
   }
 
@@ -3169,16 +3289,27 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   // Some default ones
-  sfig.latexMacro('red', 1, '\\color{red}{#1}');
-  sfig.latexMacro('blue', 1, '\\color{blue}{#1}');
-  sfig.latexMacro('green', 1, '\\color{green}{#1}');
+  var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
+  sfig.latexMacro('red', 1, '\\'+colorCmd+'{red}{#1}');
+  sfig.latexMacro('blue', 1, '\\'+colorCmd+'{blue}{#1}');
+  sfig.latexMacro('green', 1, '\\'+colorCmd+'{green}{#1}');
+  sfig.latexMacro('darkblue', 1, '\\'+colorCmd+'{darkblue}{#1}');
 
   sfig_.includeScript = function(src) {
     var head = document.head;
-    var script = document.createElement('script');
+    var script = sfig_.newElem('script');
     script.src = src;
     head.appendChild(script);
     return script;
+  }
+
+  sfig_.includeStylesheet = function(href) {
+    var head = document.head;
+    var css = sfig_.newElem('link');
+    css.setAttribute('rel', 'stylesheet');
+    css.setAttribute('href', href);
+    head.appendChild(css);
+    return css;
   }
 
   sfig.getInternalDir = function() {
@@ -3195,7 +3326,12 @@ sfig.defaultPrintNumColsPerPage = 2;
   }
 
   sfig.initialize = function() {
+    if (sfig.serverSide) return;
+
     sfig_.parseUrlParamsFromLocation();
+
+    // Make custom sfig fonts available.
+    sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
 
     if (sfig.enableMath) {
       var script = sfig_.includeScript(sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default');
@@ -3251,7 +3387,7 @@ sfig.defaultPrintNumColsPerPage = 2;
 
   // Create a figure from |block| and render it into |container|.
   sfig.figure = function(block, container) {
-    if (typeof(container) == 'string') container = document.getElementById(container);
+    if (sfig.isString(container)) container = document.getElementById(container);
     var prez = sfig.presentation({initKeys: false});
     prez.addSlide(block);
     prez.displayPrinterFriendly(container);

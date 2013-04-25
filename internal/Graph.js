@@ -21,6 +21,8 @@
       else if (p instanceof Array) p = {x:p[0], y:p[1]};
       if (p.x == null) p.x = i;
       if (p.y == null) throw 'No value specified in '+p;
+      if (!isFinite(p.x)) throw 'Bad x coordinate: ' + p.x;
+      if (!isFinite(p.y)) throw 'Bad x coordinate: ' + p.y;
       newTrajectory[i] = p;
     }
     return newTrajectory;
@@ -50,6 +52,10 @@
         i++;
       }
     });
+    if (!isFinite(minx)) throw 'minx is ' + minx;
+    if (!isFinite(miny)) throw 'miny is ' + miny;
+    if (!isFinite(maxx)) throw 'maxx is ' + maxx;
+    if (!isFinite(maxy)) throw 'maxy is ' + maxy;
     this.minValue(minx, miny).maxValue(maxx, maxy);
   }
   sfig_.inheritsFrom('Graph', Graph, sfig.Block);
@@ -66,13 +72,13 @@
       var otherLength = this.length()[1-axis].getOrDie();
       var overshoot = this.overshoot()[axis].getOrDie();
       var convert;
-      if (axis == 0)
+      if (axis == 0)  // x-axis
         convert = function(x, y) { return [x, y]; };
-      else
+      else // y-axis
         convert = function(y, x) { return [x, y] };
 
       // Axis
-      this.addChild(line([0, 0], convert((length + overshoot) * (axis == 0 ? 1 : -1), 0)));
+      this.addChild(line([0, 0], convert((length + overshoot) * (axis == 0 ? 1 : -sfig.downSign), 0)));
 
       //// Ticks and tick labels
       var tickStyle = this.tickStyle()[axis].get();
@@ -89,6 +95,7 @@
       var axisLabelPadding = this.axisLabelPadding()[axis].get();
 
       var tickStartValue = this.tickStartValue()[axis].getOrElse(minValue);
+      if (!isFinite(tickStartValue)) throw 'tickStartValue is ' + tickStartValue;
       // Determine how to space the ticks
       var tickIncrValue = this.tickIncrValue()[axis].get();
       var numTicks = this.numTicks()[axis].get();
@@ -211,7 +218,7 @@
     return +this.xlength().getOrDie() * (value - this.xminValue().get()) / (this.xmaxValue().get() - this.xminValue().get());
   }
   Graph.prototype.yvalueToCoord = function(value) {
-    return -this.ylength().getOrDie() * (value - this.yminValue().get()) / (this.ymaxValue().get() - this.yminValue().get());
+    return -sfig.downSign * this.ylength().getOrDie() * (value - this.yminValue().get()) / (this.ymaxValue().get() - this.yminValue().get());
   }
 
   // Trajectory

@@ -64,7 +64,7 @@
       var a = this.branches[0].child.headBox;
       var b = this.branches[this.branches.length-1].child.headBox;
       var x = a.xmiddle().add(b.xmiddle()).div(2);
-      var y = this.childrenBlock.top().sub(this.ymargin());
+      var y = this.childrenBlock.top().up(this.ymargin());
       this.headBox.pivot(0, +1).shift(x, y);
     }
   };

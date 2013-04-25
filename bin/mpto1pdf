@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Converts a Metapost file <prefix>.mp into a PDF file <prefix>.pdf.
+# If -quiet is set, writes to <prefix>.log.
+# Uses a <prefix>.tmp directory (doesn't delete if conversion failed).
+#
+# This is a wrapper for mptopdf, and is a messy hack, but then again, mptopdf
+# is kind of messy.
+#
+# Percy Liang
+# 08/24/07
+#
+# This script is taken from rfig with a few modifications.
+# Updated 04/20/13
+
+if [ $# -lt 1 ]; then
+  echo "Usage: `basename $0` [-quiet] <metapost file>"
+  exit 1
+fi
+
+bindir=`dirname $0`
+if [[ $bindir != /* ]]; then
+  bindir=$PWD/$bindir
+fi
+
+if [ "$1" == "-quiet" ]; then
+  quiet=1
+  shift
+else
+  quiet=0
+fi
+p=$1; p=${p/\.mp/} # Prefix
+tmp=$p.tmp
+rm -rf $tmp || exit 1
+
+if [ $quiet == 1 ]; then
+  out=../`basename $p`.log
+else
+  out=/dev/stdout
+fi
+
+mkdir $tmp || exit 1 # Create temporary directory
+(
+  cd $tmp || exit 1
+  echo "mpto1pdf: writing to $tmp" > $out || exit 1
+
+  p=`basename $p`
+  # Link up the files so it looks like we are running in that current directory
+  for x in ../*; do
+    ln -sf $x || exit 1
+  done
+  # Do not symlink the old file or the log
+  rm -f $p.pdf $p-*.pdf $p.log || exit 1
+
+  # Convert to pdf files
+  # Stupid mptopdf does not return exit code 1 if it fails
+  # But ls $p-*.pdf should fail
+  if [ $quiet == 1 ]; then
+    mptopdf -metafun $p.mp < /dev/null >> $out 2>&1 || (echo ==================================================; cat $out $p.tmp/mpxerr.log; exit 1)
+  else
+    mptopdf -metafun $p.mp || exit 1
+  fi
+
+  # Join pdf files
+  $bindir/pdfjoin --outfile $p.pdf \
+    `/bin/ls $p-*.pdf 2>/dev/null | awk -F '-' '{print $NF,$0}' | sort -n | awk '{print $2}'` >> $out 2>&1 || exit 1
+
+  cp $p.pdf .. || exit 1
+  echo "Output written successfully to $p.pdf" >> $out || exit 1
+) || exit 1
+rm -r $tmp || exit 1 # Remove temporary directory

@@ -1,0 +1,335 @@
+#! /bin/sh
+##
+##  pdfnup: A shell program to generate a "n-up" version of a PDF file
+##
+##  Author David Firth (http://www.warwick.ac.uk/go/dfirth)
+##
+version=1.20
+echo "This is pdfnup version ""$version"
+##
+##  Relies on pdflatex and the 'pdfpages' package (version 0.2e 
+##  or later).
+##
+#######################################################################
+##  CONFIGURATION: change this block as necessary
+##
+##  THESE SETTINGS WILL BE OVER-RIDDEN by any found at 
+##     /etc/pdfnup.conf
+##     /usr/share/etc/pdfnup.conf
+##     /usr/local/share/pdfnup.conf
+##     /usr/local/etc/pdfnup.conf
+##     ~/.pdfnup.conf
+##  (which are read in that order)
+##  
+##  First say where your "pdflatex" program lives:
+##
+pdflatex=pdflatex
+#pdflatex="pdflatex.exe"    ## this for Windows computers
+##
+##  Next a permitted location for temporary files on your system:
+##
+tempfileDir="/var/tmp" ## /var/tmp is standard on many unix systems
+#tempfileDir="C:/tmp"  ## use something like this under Windows
+##
+##  Now specify the default settings for pdfnup:
+##
+frame=false            ## do not print a thin border around pages
+nup=2x1                ## two logical pages side by side
+paper=a4paper          ## alternatives are other LaTeX paper sizes
+orient=auto            ## alternatives are landscape and portrait
+pages=all
+turn=true              ## landscape pages are landscape-oriented
+noautoscale=false      ## scale logical pages to fit
+column=false           ## don't use column-major ordering
+columnstrict=false     ## (see the pdfpages manual)
+delta="0 0"            ## no space between logical pages
+offset="0 0"           ## output centred on physical page
+trim="0 0 0 0"         ## don't trim the logical pages
+scale=1.0              ## don't scale the resultant pages
+openright=false        ## don't insert blank page at front of document
+tidy=true              ## delete all temporary files immediately
+##
+##  END OF CONFIGURATION
+#######################################################################
+##
+##  Read the configuration file(s) if such exist:
+##
+for d in /etc /usr/share/etc /usr/local/share /usr/local/etc
+do if test -f $d/pdfnup.conf; then
+     echo "Reading site configuration from $d/pdfnup.conf"
+     source $d/pdfnup.conf
+   fi 
+done
+if test -f ~/.pdfnup.conf; then 
+   echo "Reading user defaults from ~/.pdfnup.conf";
+   source ~/.pdfnup.conf; 
+fi
+#######################################################################
+##
+##  Define the output of "pdfnup --help"
+##
+helptext="
+Usage: pdfnup args
+where args must include source pdf filename(s) and optionally also
+* a specification, such as --nup 2x1 (two pages side by side)
+                           --nup 1x2 (two pages stacked vertically)
+                           --nup 2x2  etc 
+  (in general mxn, where m and n are single-digit integers)
+* a list or range of pages to be included, for example
+                           --pages 3-6
+                           --pages 2,8,4,5
+                           --pages all
+* a LaTeX papersize, for example --paper a4paper
+                                 --paper letterpaper
+* the output page orientation, one of --orient landscape
+                                      --orient portrait
+                                      --orient auto
+  (""auto"" guesses orientation; in the case of --nup 2x2,
+  --nup 3x3, etc., ""auto"" produces output pages the same size
+  as the logical pages being n-upped.)
+* one of --frame true 
+         --frame false 
+  according to whether or not a thin line is required around pages
+* a page-trimming specification such as
+         --trim \"1cm 1cm 1cm 1cm\"
+  (Note that trimming does not mix well with --frame true.)
+* an \"offset\" specification such as
+         --offset \"1cm 0.5cm\"
+  to offset the position of output pages (see the pdfpages manual)
+* a \"delta\" specification such as
+         --delta \"1cm 1cm\"
+  to put space between logical pages (see the pdfpages manual)
+* a \"scale\" specification such as
+         --scale 0.91
+  to scale the output up or down in size (decrease or increase margins)
+* one of --openright true
+         --openright false
+  according to whether or not a blank page should be inserted before 
+  the first logical page
+* one of --turn true
+         --turn false
+  according to whether or not landscape pages should be displayed in
+  landscape orientation
+* one of --noautoscale true
+         --noautoscale false
+  for scaling of logical pages to fit (or not)
+* one of --column true
+         --column false
+  according to whether or not column-major order should be used
+* one of --columnstrict true
+         --columnstrict false
+  for whether or not the *last* page should be column-major ordered
+  regardless of how full it is
+* a specific name for the output file, e.g. --outfile my2up.pdf
+* one of --tidy true
+         --tidy false
+  according to whether or not temporary files should be deleted immediately.
+  If --tidy false is used, such files are left in $tempfileDir.
+
+Default arguments for you at this site are
+  --frame $frame --nup $nup --paper $paper --orient $orient --pages $pages --trim \"$trim\" --delta \"$delta\" --offset \"$offset\" --scale $scale --turn $turn --noautoscale $noautoscale --openright $openright --column $column --columnstrict $columnstrict --tidy $tidy
+
+For information and version history see http://www.warwick.ac.uk/go/pdfjam
+"
+##
+##  Check that necessary LaTeX packages are installed
+##
+PATH=`dirname "$pdflatex"`:$PATH
+export PATH
+case `kpsewhich pdfpages.sty` in
+	"") echo "pdfnup: pdfpages.sty not installed"; exit 1;;
+esac
+case `kpsewhich eso-pic.sty` in
+	"") echo \
+	    "pdfnup: eso-pic.sty not installed (see the pdfpages manual)"
+	    exit 1;;
+esac
+case `kpsewhich everyshi.sty` in
+	"") echo \
+	    "pdfnup: everyshi.sty not installed (see the pdfpages manual)"
+	    exit 1;;
+esac
+##
+##  Now do the argument loop...
+##
+sourcePath=
+outFile=
+inFiles=0
+newline='
+'
+while test -n "${1}"; do
+  case "${1}" in
+  	*.pdf) inFiles=`expr $inFiles + 1`;
+  	       sourcePath="$sourcePath$newline${1}";;
+  	--help) echo "$helptext";
+            exit 0;;
+    --pages) pages="${2}"
+  	         shift;;
+  	--outfile) outFile="${2}" 
+  	           case "$outFile" in
+  	           	*".pdf");;
+  	           	*) echo "pdfnup: outfile name must end in .pdf"; 
+  	           	   exit 1;;
+  	           esac
+  	           shift;;
+  	--nup) nup="${2}"
+  	       shift;;
+  	--frame) frame="${2}"
+  	         shift;;
+  	--paper) paper="${2}"
+  	         shift;;
+  	--orient) orient="${2}"
+  	          shift;;
+  	--trim) trim="${2}"
+  	          shift;;
+  	--delta) delta="${2}"
+  	          shift;;
+  	--offset) offset="${2}"
+  	          shift;;
+  	--scale) scale="${2}"
+  	          shift;;
+  	--turn) turn="${2}"
+  	          shift;;
+  	--noautoscale) noautoscale="${2}"
+  	          shift;;
+  	--openright) openright="${2}"
+  	          shift;;
+  	--column) column="${2}"
+  	          shift;;
+  	--columnstrict) column="${2}"
+  	          shift;;
+  	--tidy) tidy="${2}"
+  	        shift;;
+  	*) echo "pdfnup: unrecognised argument ${1}"; exit 1;;
+  esac
+  shift
+done
+if test $inFiles -gt 1 ; then
+  if test "$outFile" != "" ; then
+    echo "pdfnup: --outfile cannot be used with multiple input files"; 
+    echo "pdfnup: no files processed"
+    exit 1;
+  fi
+fi
+case "$sourcePath" in
+  "") echo "pdfnup: no pdf source file specified
+For information on usage try \"pdfnup --help\""; exit 1;;
+esac
+OIFS=IFS
+IFS="$newline"
+for k in $sourcePath
+do
+  if test -f "$k"; then :; 
+    else echo "pdfnup: ""$k"" does not exist, no files were processed"; 
+    exit 1;
+  fi
+done
+IFS=OIFS
+case $pages in
+	all) pages=-;;
+	*) pages={$pages};;
+esac
+##
+##  That's the arguments done.
+##
+##  Next sort out paper orientation, if not specified
+##
+x=`echo $nup | sed 's/..$//'`
+y=`echo $nup | sed 's/^..//'`
+fitpaper=false  ## the normal setting
+case $orient in
+	auto) fitpaper=true  ## used only for 2x2, 3x3 etc.
+	      if test "$x" -gt "$y"
+          then orient=landscape ; fitpaper=false
+          fi
+          if test "$y" -gt "$x"
+          then orient=portrait ; fitpaper=false
+          fi;;
+esac
+pwd=`pwd | sed 's/ /\\ /'`
+IFS="$newline"
+##
+##  Now work on the input file (or files in turn)
+##
+counter=0
+for inFile in $sourcePath
+do
+  echo "Processing $inFile..."
+  counter=`expr $counter + 1`
+  cd "$pwd"
+  pdfName=`basename "$inFile"`
+  sourceDir=`dirname "$inFile"` ; cd "$sourceDir" ; sourceDir=`pwd`
+  sourceFullPath="$sourceDir"/"$pdfName"
+  cd "$pwd"
+  case "$outFile" in
+	  "") ## no --outfile argument supplied
+	      outfileNameRoot=`echo "$pdfName" | sed 's/\.pdf$//'`-$nup;
+	      outfileDir="$sourceDir";
+	      outFile="$outfileNameRoot"".pdf";;
+	   *) ## --outfile argument was supplied
+	      outfileNameRoot=`basename "$outFile" | sed 's/\.pdf$//';`
+	      outfileDir=`dirname "$outFile"` ; 
+	      cd "$outfileDir" ; 
+	      outfileDir=`pwd` ;;
+  esac
+  case "$outfileDir"/"$outfileNameRoot"".pdf" in
+    $sourceFullPath) echo "pdfnup: outfile and source cannot be the same";
+  	            exit 1;;
+    //"$outfileNameRoot"".pdf") outfileDir="";;  ## in case of output 
+  esac                                           ## to the root directory!
+  ##
+  ##  Now edit the temporary LaTeX input file
+  ##
+  uniqueName="$$"-"$counter"
+  ln -s "$sourceFullPath" "$tempfileDir"/"$uniqueName"source.pdf
+  texFile="$tempfileDir"/"$uniqueName".tex
+  msgFile="$tempfileDir"/"$uniqueName".msgs
+  (sed s*pdfname*"$tempfileDir"/"$uniqueName"source.pdf* <<EndTemplate
+\documentclass[papersize,orientation]{article}
+\usepackage{pdfpages}
+\begin{document}
+\includepdf[pages=,nup=,frame=,fitpaper=,trim=,delta=,offset=,scale=,turn=,noautoscale=,column=,columnstrict=,openright=]{pdfname}
+\end{document}
+EndTemplate
+) \
+    | sed 's/^[^b]egin/\\begin/' \
+    | sed s/pages=/pages="$pages"/ \
+    | sed s/nup=/nup="$nup"/ \
+    | sed s/frame=/frame="$frame"/ \
+    | sed s/fitpaper=/fitpaper="$fitpaper"/ \
+    | sed s/trim=/trim="$trim"/ \
+    | sed s/delta=/delta="$delta"/ \
+    | sed s/offset=/offset="$offset"/ \
+    | sed s/scale=/scale="$scale"/ \
+    | sed s/turn=/turn="$turn"/ \
+    | sed s/noautoscale=/noautoscale="$noautoscale"/ \
+    | sed s/openright=/openright="$openright"/ \
+    | sed s/column=/column="$column"/ \
+    | sed s/columnstrict=/columnstrict="$columnstrict"/ \
+    | sed s/papersize/"$paper"/ \
+    | sed s/orientation/"$orient"/ > $texFile
+  echo "  Temporary LaTeX file for this job is ""$texFile"
+  ##
+  ##  Now run pdflatex and tidy up
+  ##
+  echo "  Calling pdflatex..."
+  cd "$tempfileDir"
+  "$pdflatex" --interaction batchmode "$texFile" > "$msgFile"
+  if test -f "$tempfileDir"/"$uniqueName"".aux";  
+        ## ie if LaTeX didn't choke
+    then if cp "$tempfileDir"/"$uniqueName".pdf \
+               "$outfileDir"/"$outfileNameRoot"".pdf"
+         then echo "  Finished: output is"\
+                   "$outfileDir"/"$outfileNameRoot"".pdf"
+         fi
+         case "$tidy" in
+           true) rm "$tempfileDir"/"$uniqueName"* ;;
+         esac
+         outFile=""
+    else echo "  Failed: output file not written"
+  fi 
+done
+IFS=OIFS
+
+
+
