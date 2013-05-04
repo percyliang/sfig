@@ -12,6 +12,7 @@ sfig.importMethods(this, [
 sfig.initialize();
 
 sfig.Text.defaults.setProperty('fontSize', 18);
+sfig.TextBox.defaults.setProperty('fontSize', 14);
 
 var prez = sfig.presentation();
 var slideNum = 0;
@@ -22,13 +23,13 @@ function example(code, options) {
   var target = wrap(eval(code));
   var numRows = (options && options.numRows) || code.split('\n').length;
   return frame(xtable(
-    textBox().size(50, numRows).content(code).onEnter(function(box) {
+    textBox().multiline(true).size(50, numRows).content(code).onEnter(function(box) {
       var input = box.content().get();
       var output = eval(input);
       target.resetContent(output);
       prez.refresh(function() { box.textElem.focus(); });
     }),
-    sfig.rightArrow(50),
+    sfig.rightArrow(50).strokeWidth(5).color('brown'),
     frame(target).padding(5).bg.strokeWidth(1).strokeColor('gray').end,
   _).xmargin(20).center()).padding(10);
 }
@@ -44,7 +45,7 @@ _).id('title'));
 
 add(slide('Why sfig?',
   'As motivation, consider the task of drawing nodes with labels inside:',
-  example("function node(s) {\n  l = text(s)\n  c = ellipse(l.realWidth().mul(0.7),\n              l.realHeight().mul(0.7))\n  return overlay(l, c).center()\n}\na = node('$G_{n,p}$')\nb = node('graph')\nxtable(a, b).center().margin(40)"),
+  example("function node(s) {\n  l = text(s)\n  c = ellipse(l.realWidth().mul(0.7),\n              l.realHeight().mul(0.7))\n  return overlay(l, c).center()\n}\na = node('$G_{n,p}$')\nb = node('graph')\nytable(a, b).center().margin(40)"),
   '<b>Factor out form and content</b>: figures often have recurring elements which display different content in the same form (e.g., circled nodes).  Using code, we can define the form <em>once</em> in a function and use it with different content (e.g., <tt>node(\'algorithm\')</tt>, <tt>node(\'graph\')</tt>).',
   '<b>Relative layout</b>: creating figures by code would be tedious if we had to specify the absolute sizes/positions of all the elements.  sfig offers constructs (e.g., <tt>overlay</tt>, <tt>xtable</tt>) to specify control layout in a higher-level way.',
   '<b>MathJax integration</b>: Embed $\\LaTeX$ seamlessly into your figures.',
@@ -94,17 +95,20 @@ add(slide('Tables',
   'A Table is built from a two-dimensional matrix of Blocks.',
   'It uses the bounding boxes of the Blocks to position.',
   'By default, everything is left justified:',
-  example("table(['cat', 'dog'], ['caterpillar', circle(40)])\n  .margin(10)"),
+  example("table(['cat', 'dog'], ['caterpillar', circle(30)])\n  .margin(10)"),
   'We can re-justify (l is left, c is center, r is right):',
-  example("table(['cat', 'dog'], ['caterpillar', circle(40)])\n  .margin(10).justify('cl', 'r')"),
+  example("table(['cat', 'dog'], ['caterpillar', circle(30)])\n  .margin(10).justify('cl', 'r')"),
   'The first argument (cl) corresponds to the x-axis and the second (r) to the y-axis.',
 _))
 
 add(slide('Referencing other Blocks',
   'sfig tries hard to avoid absolute references. We saw that Tables and Overlays are constructs that position Blocks relative to each other, but these relations are only with respect to a given hierarchy.',
   'We can also create relative references more directly as follows inside an Overlay:',
-  example("c = circle(20)\nl = center('C').shift(c.right().add(8), c.ymiddle())\noverlay(c, l)"),
+  example("c = circle(20)\nl = center('C')\n  .shift(c.right().add(8), c.ymiddle())\noverlay(c, l)"),
   'Note that the position of the label depends dynamically on that of c, which critically might not be known when the Blocks are constructed.',
+_));
+
+add(slide('Referencing other Blocks (continued)',
   'Another example (note that it would be hard to get the absolute size of the text):',
   example("t = text('hello world')\nl = line([t.left(), t.ymiddle()],\n         [t.right(), t.ymiddle()])\noverlay(t, l)"),
   'We can also access the width and height (the real prefix refers to what\'s actually rendered):',
@@ -114,16 +118,16 @@ _));
 
 add(slide('Links',
   'We can attach hyperlinks to internal slides:',
-  example("text('Go to title page').linkToInternal(prez, 'title', 0)"),
+  example("text('Go to title page')\n  .linkToInternal(prez, 'title', 0)"),
   'Or other sfig presentations:',
-  example("text('Go to simple presentation').linkToExternal('simple-presentation')"),
+  example("text('Go to simple presentation')\n  .linkToExternal('simple-presentation')"),
   'Or different URLs:',
   example("text('Google').linkToUrl('http://www.google.com')"),
 _));
 
 add(slide('Events',
   'We can attach the usual events to Blocks:',
-  example("circle(30).onClick(function() { alert('Clicked') })"),
+  example("circle(30).onClick(function() {\n  alert('Clicked')\n})"),
 _));
 
 add(slide('Animation',
@@ -137,7 +141,7 @@ function equationEditor() {
   function convert(str) { return '$\\displaystyle ' + str + '$'; }
   var target = wrap(convert(example));
   return parentCenter(ytable(
-    textBox().size(50, 1).content(example).onEnter(function(box) {
+    textBox().size(30, 1).content(example).onEnter(function(box) {
       target.resetContent(convert(box.content().get()));
       prez.refresh(function() { box.textElem.focus(); });
     }),
@@ -177,7 +181,7 @@ function timeSeriesPlotter() {
   }
   var target = wrap(convert(example));
   return parentCenter(xtable(
-    textBox().size(30, 10).content(example).onEnter(function(box) {
+    textBox().multiline(true).size(30, 10).content(example).onEnter(function(box) {
       target.resetContent(convert(box.content().get()));
       prez.refresh(function() { box.textElem.focus(); });
     }),
