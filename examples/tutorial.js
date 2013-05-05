@@ -13,6 +13,7 @@ sfig.initialize();
 
 sfig.Text.defaults.setProperty('fontSize', 18);
 sfig.TextBox.defaults.setProperty('fontSize', 14);
+sfig.Slide.defaults.setProperty('showHelp', true);
 
 var prez = sfig.presentation();
 var slideNum = 0;
@@ -39,7 +40,7 @@ prez.addSlide(slide('',
   'sfig is a Javascript library for creating SVG-based presentations and figures.  Here\'s an example:',
   example("circle(20).color('blue')", {numRows: 4}),
   'You can edit the Javascript code (e.g., try changing the color to red) and press ctrl-enter to see the updated result.',
-  'Use the arrow keys to move between slides.  Press \'?\' for help.',
+  'Use the arrow keys to move between slides.',
   text('Download the code from GitHub.'.fontcolor('blue')).linkToUrl('http://github.com/percyliang/sfig'),
 _).id('title'));
 
