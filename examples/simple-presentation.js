@@ -4,17 +4,15 @@
 // Don't need math for this simple example
 sfig.enableMath = false;
 
-// Add to this namespace for convenient access
-sfig.importMethods(sfig.serverSide ? global : this, [
-  '_', 'pause', 'overlay', 'parentCenter', 'circle', 'xtable',
-  'bulletedText', 'arrow', 'transform', 'slide'
-]);
+// Make this work for both Metapost and in browser.
+G = sfig.serverSide ? global : this;
 
+// Add to this namespace for convenient access
+sfig.importAllMethods(G);
 sfig.initialize();
 
 // Create a new presentation
-var prez = sfig.presentation();
-if (sfig.serverSide) global.prez = prez;
+G.prez = sfig.presentation();
 
 prez.addSlide(slide('Introduction',  // Title to show at the top.
   'Welcome to sfig.',  // Just some text.

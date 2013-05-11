@@ -56,6 +56,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
     });
   }
 
+  // Import everything in sfig.
+  sfig.importAllMethods = function(target) {
+    for (var name in sfig)
+      target[name] = sfig[name];
+  }
+
   // Usage: someFunction(3, 4, _)
   // Ignored if in function arguments.  Useful as the final argument so all
   // real arguments can have a trailing comma (easier to shuffle things
