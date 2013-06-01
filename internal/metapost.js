@@ -6,7 +6,7 @@
 //    cause lots of confusion/inconsistencies.  User should use:
 //    [10, down(20)] to refer to points.
 //    Shifting (p.yshift(3)) shifts down.
-// TODO: handle orphans
+// TODO: handle orphans in general (already handled for tables)
 // @author Percy Liang
 
 var fs = require('fs');
@@ -404,6 +404,8 @@ function isLeaf(block) {
     //content = content.replace(/_/g, '\\_');
     content = content.replace(/&/g, '\\&');
     content = content.replace(/#/g, '\\#');
+    //content = content.replace(/{/g, '\\{');
+    //content = content.replace(/}/g, '\\}');
     //sfig.L(content);
 
     // In Metapost, wrapping means we have to put things in a minipage, which
@@ -1043,16 +1045,17 @@ function isLeaf(block) {
       }
       block.children.forEach(computeImageSizes);
     }
-    prez.slides.forEach(computeImageSizes);
+    this.slides.forEach(computeImageSizes);
 
+    var self = this;
     var paths = [];
     sfig_.queue.apply(function() {
-      for (var slideIndex = 0; slideIndex < prez.slides.length; slideIndex++) {
-        var slide = prez.slides[slideIndex];
+      for (var slideIndex = 0; slideIndex < self.slides.length; slideIndex++) {
+        var slide = self.slides[slideIndex];
         var id = slide.id().getOrElse(slideIndex);
         var slidePrefix = outPrefix + '/' + id;
         if (!opts.lazy || !Path.existsSync(slidePrefix + '.pdf')) {
-          sfig.L('Slide ' + slideIndex + '/' + prez.slides.length + ': ' + id);
+          sfig.L('Slide ' + slideIndex + '/' + self.slides.length + ': ' + id);
           createMetapost(slide, slidePrefix + '.mp');
         }
         paths.push(slidePrefix + '.pdf');

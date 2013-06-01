@@ -5,7 +5,6 @@
 var sfig = {}; // Namespace of public members.
 var sfig_ = {}; // Namespace of private members.
 
-// 
 // for node.js: make sfig and sfig_ accessible by everyone.
 if (typeof global != 'undefined') {
   global.sfig = sfig;
@@ -13,6 +12,7 @@ if (typeof global != 'undefined') {
   sfig.serverSide = true;
 } else {
   sfig.serverSide = false;
+  require = function() { }  // Do nothing
 }
 
 ////////////////////////////////////////////////////////////
@@ -3286,6 +3286,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Presentation.prototype.serialize = function() {
     console.log(new XMLSerializer().serializeToString(document));
+  }
+
+  // Do nothing
+  if (!sfig.serverSide) {
+    Presentation.prototype.writePdf = function() { }
   }
 
   sfig.presentation = function(rootBlock, container) { return new sfig.Presentation(rootBlock, container); }
