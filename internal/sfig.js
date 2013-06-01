@@ -58,8 +58,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Import everything in sfig.
   sfig.importAllMethods = function(target) {
-    for (var name in sfig)
+    for (var name in sfig) {
+      if (name == "Image") continue;  // Conflicts with the Image object.
       target[name] = sfig[name];
+    }
   }
 
   // Usage: someFunction(3, 4, _)
