@@ -1725,6 +1725,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
       img = new window.Image();
       img.src = path;
       var self = this;
+      img.onerror = function() {
+        sfig.L('Unable to load: ' + path);
+        self.elem = sfig_.newSvgElem('image');
+        callback();
+      }
       img.onload = function() {
         var dim = self.computeDesiredDim(img.width, img.height);
         var elem = sfig_.newSvgElem('image');
