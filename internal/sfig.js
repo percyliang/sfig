@@ -2309,12 +2309,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.bg.setEnd(this);
     this.titleBlock = new sfig.Wrap();
 
+    var transformedTitleBlock = sfig.transform(this.titleBlock).pivot(-1, 0).xshiftBy(10);
     var bgWithTitle = sfig.overlay(
       this.bg,  // Rectangular background
-      sfig.transform(this.titleBlock).pivot(-1, 0).xshiftBy(10),  // Title
+      transformedTitleBlock, // Title (hack)
     _);
-    this.overlay = sfig.overlay(bgWithTitle, this.content);
-    this.overlay.pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
+    var transformedBgWithTitle = sfig.transform(bgWithTitle).pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
+    var transformedContent = sfig.transform(this.content).pivot(this.xpivot().orElse(0), this.ypivot().orElse(0)); // Center by default
+    this.overlay = sfig.overlay(transformedBgWithTitle, transformedContent.yshiftBy(this.titleBlock.realHeight().div(2)));
   };
   sfig_.inheritsFrom('Frame', Frame, sfig.Block);
 
@@ -2335,7 +2337,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       width.set(contentWidth.max(titleWidth));
     }
     if (!height.exists())
-      height.set(this.content.realHeight().add((this.ypadding().getOrElse(0) + extra) * 2));
+      height.set(this.content.realHeight().add((this.ypadding().getOrElse(0) + extra) * 2).add(this.titleBlock.realHeight().div(2)));
 
     this.addInitDependency(this.content);
     this.addInitDependency(this.titleBlock);
