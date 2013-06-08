@@ -1,0 +1,129 @@
+#!/bin/bash
+
+if [ $# != 1 ]; then
+  echo "Usage: `basename $0` <directory to create presentation>"
+  exit 1
+fi
+
+out=$1
+
+mkdir $out || exit 1
+
+# Link to this directory
+ln -sf $PWD $out/sfig || exit 1
+
+cat <<EOF > $out/index.html 
+<head>
+  <script src="sfig/internal/sfig.js"></script>
+  <script src="sfig/internal/Graph.js"></script>
+  <script src="sfig/internal/RootedTree.js"></script>
+  <script src="sfig/external/seedrandom.js"></script>
+  <script src="utils.js"></script>
+  <script src="index.js"></script>
+</head>
+<body onload="prez.run()">
+</body>
+EOF
+
+cat <<EOF > $out/utils.js
+G = sfig.serverSide ? global : this;
+sfig.importAllMethods(G);
+
+// Latex macros
+sfig.latexMacro('R', 0, '\mathbb{R}');
+sfig.latexMacro('P', 0, '\mathbb{P}');
+sfig.latexMacro('E', 0, '\mathbb{E}');
+sfig.latexMacro('diag', 0, '\text{diag}');
+
+sfig.initialize();
+
+G.prez = sfig.presentation();
+
+// Useful functions (not standard enough to put into an sfig library).
+
+G.frameBox = function(a) { return frame(a).padding(5).bg.strokeWidth(1).fillColor('white').end; }
+
+G.bigLeftArrow = function() { return leftArrow(100).strokeWidth(10).color('brown'); }
+G.bigRightArrow = function() { return rightArrow(100).strokeWidth(10).color('brown'); }
+G.bigUpArrow = function() { return upArrow(100).strokeWidth(10).color('brown'); }
+G.bigDownArrow = function() { return downArrow(100).strokeWidth(10).color('brown'); }
+G.red = function(x) { return x.fontcolor('red'); }
+G.green = function(x) { return x.fontcolor('green'); }
+G.blue = function(x) { return x.fontcolor('blue'); }
+G.darkblue = function(x) { return x.fontcolor('darkblue'); }
+
+G.xseq = function() { return new sfig.Table([arguments]).center().margin(5); }
+G.yseq = function() { return ytable.apply(null, arguments).margin(10); }
+
+G.stmt = function(prefix, suffix) { return prefix.fontcolor('darkblue') + ':' + (suffix ? ' '+suffix : ''); }
+G.headerList = function(title) {
+  var contents = Array.prototype.slice.call(arguments).slice(1);
+  return ytable.apply(null, [title ? stmt(title) : _].concat(contents.map(function(line) {
+    if (line == _) return _;
+    if (typeof(line) == 'string') return bulletedText([null, line]);
+    if (line instanceof sfig.PropertyChanger) return line;
+    return indent(line);
+  })));
+}
+
+G.node = function(x, shaded) { return overlay(circle(20).fillColor(shaded ? 'lightgray' : 'white') , x).center(); }
+G.indent = function(x, n) { return frame(x).xpadding(n != null ? n : 20).xpivot(1); }
+G.stagger = function(b1, b2) { b1 = std(b1); b2 = std(b2); return overlay(b1, pause(), b2.replace(b1)); }
+
+G.dividerSlide = function(text) {
+  return slide(null, nil(), parentCenter(text)).titleHeight(0);
+}
+
+G.moveLeftOf = function(a, b, offset) { return transform(a).pivot(1, 0).shift(b.left().sub(offset == null ? 5 : offset), b.ymiddle()); }
+G.moveRightOf = function(a, b, offset) { return transform(a).pivot(-1, 0).shift(b.right().add(offset == null ? 5 : offset), b.ymiddle()); }
+G.moveTopOf = function(a, b, offset) { return transform(a).pivot(0, 1).shift(b.xmiddle(), b.top().sub(offset == null ? 5 : offset)); }
+G.moveBottomOf = function(a, b, offset) { return transform(a).pivot(0, -1).shift(b.xmiddle(), b.bottom().add(offset == null ? 5 : offset)); }
+G.moveCenterOf = function(a, b) { return transform(a).pivot(0, 0).shift(b.xmiddle(), b.ymiddle()); }
+EOF
+
+cat <<EOF > $out/index.js
+// For node.js
+require('./sfig/internal/sfig.js');
+require('./sfig/internal/Graph.js');
+require('./sfig/internal/RootedTree.js');
+require('./sfig/internal/metapost.js');
+require('./sfig/external/seedrandom.js');
+require('./utils.js');
+
+// Title slide
+prez.addSlide(slide(nil(),
+  ytable('(title)', '(subtitle)').center().scale(1.3).strokeColor('darkblue'),
+  ytable(
+    text('(your name)').scale(1.2),
+  _).center().ymargin(20),
+  ytable(
+    nowrapText('(venue)'),
+    'June 7, 2013',
+  _).center().scale(0.8),
+_).body.center().end.showIndex(false).showHelp(true));
+
+// First introduction slide
+prez.addSlide(slide('Introduction',
+  stmt('Goal', 'write a presentation'),
+  pause(),
+  headerList('Points',
+    'first',
+    'second',
+    'third',
+  _),
+  pause(),
+  parentCenter(
+    xseq(frameBox('problem'), bigRightArrow(), frameBox('solution')).center(),
+  _),
+_));
+
+prez.addSlide(dividerSlide('To be continued...'.italics()));
+
+// For node.js: output PDF (you must have Metapost installed).
+prez.writePdf({outPrefix: 'index'});
+EOF
+
+echo "Your presentation has been created in $out."
+echo "To view it, point your browser to: $out/index.html"
+echo "To edit it, open: $out/index.js"
+echo "To generate PDF (via node.js and Metapost), type: (cd $out && node index.js)"

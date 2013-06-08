@@ -174,10 +174,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.javascriptEscape = function(s) { return '\'' + s.replace(/'/g, '\\\'') + '\''; }
 
   // Create an element with the desired attributes.
-  sfig_.newElem = function(type) { return document.createElement(type); }
+  sfig_.newElem = function(type) {
+    if (typeof document == 'undefined') return null;  // Happens on server side
+    return document.createElement(type);
+  }
   sfig_.svgns = 'http://www.w3.org/2000/svg';
   sfig_.newSvgElem = function(type) {
-    if (typeof document == 'undefined') return null;
+    if (typeof document == 'undefined') return null;  // Happens on server side
     return document.createElementNS(sfig_.svgns, type);
   }
   sfig_.newSvg = function() {
@@ -2690,7 +2693,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var notes = slide.notes().get();
       if (notes)
         items.push(sfig.explain('Notes', notes, {pivot: [1, -1], borderWidth: 1}));
-      if (slide.showHelp().get())
+      if (!sfig.serverSide && slide.showHelp().get())
         items.push(sfig.explain('Help', this.getHelpBlock(), {pivot: [1, -1], borderWidth: 1}));
       if (slide.rightHeader().exists())
         items.push(slide.rightHeader().get());
@@ -2920,6 +2923,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   Presentation.prototype.getHelpBlock = function() {
+    if (sfig.serverSide) return sfig.nil();
     var rows = this.keyBindings.map(function(binding) {
       return [binding.keys.map(function(key) { return key.fontcolor('blue') }).join(' | '.fontcolor('brown')), binding.description];
     });
@@ -2927,7 +2931,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       'This presentation is created using <a href="'+sfig.homePage+'" target="blank">sfig '+sfig.version+'</a>.',
       'Key bindings'.bold(),
       new sfig.Table(rows).xjustify('rl').xmargin(15),
-    _).center().ymargin(10);
+    _).center().ymargin(10).scale(0.8);
   }
 
   Presentation.prototype.readyForSlideShowKey = function() {

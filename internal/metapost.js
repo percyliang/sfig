@@ -11,7 +11,6 @@
 
 var fs = require('fs');
 var Path = require('path');
-L = sfig.L;
 
 if (!sfig.serverSide) throw 'This script only works on the server side.';
 
@@ -84,6 +83,7 @@ function isLeaf(block) {
   MetapostExpr.nullpicture = MetapostExpr.picture('nullpicture');
 
   MetapostExpr.intersectionpoint = function(p1, p2) { return new MetapostExpr('pair', 'intersectionpoint', [p1, p2]); }
+  MetapostExpr.mediation = function(f, p1, p2) { return new MetapostExpr('pair', 'mediation', [f, p1, p2]); }
 
   //MetapostExpr.append = function(a, b) { return new MetapostExpr(a.type, 'append', [a, b]); }
   MetapostExpr.draw = function(path, opts) { return new MetapostExpr('picture', 'image', [new MetapostExpr('picture', 'draw', [path].concat(opts))]); }
@@ -115,6 +115,8 @@ function isLeaf(block) {
     if (this.type == 'numeric' && sfig.isNumber(this.func)) return MetapostExpr.numeric(-this.func);
     return new MetapostExpr(this.type, '-', [this]);
   }
+  MetapostExpr.prototype.square = function() { return this.mul(this); }
+  MetapostExpr.prototype.sqrt = function() { return new MetapostExpr('numeric', 'sqrt', [this]); }
   MetapostExpr.prototype.add = function(p) {
     p = MetapostExpr.ensureNumeric(p);
     if (this.isZero()) return p;
@@ -159,6 +161,7 @@ function isLeaf(block) {
   MetapostExpr.prototype.abs = function() { return new MetapostExpr(this.type, 'abs', [this]); }
 
   MetapostExpr.prototype.bbox = function() { return new MetapostExpr('path', 'mybbox', [this]); }
+  MetapostExpr.prototype.length = function() { return new MetapostExpr('numeric', 'length', [this]); }
   MetapostExpr.prototype.center = function() { return new MetapostExpr('pair', 'center', [this]); }
   MetapostExpr.prototype.reverse = function() { return new MetapostExpr('path', 'reverse', [this]); }
 
@@ -196,11 +199,13 @@ function isLeaf(block) {
     olive: '#808000',
     pink: '#FAAFBE',
   };
+  // Replace with hexcolor
   for (var color in MetapostExpr.colorMap)
     MetapostExpr.colorMap[color] = MetapostExpr.hexcolor(MetapostExpr.colorMap[color]);
   MetapostExpr.ensureColor = function(color) {
     if (color instanceof MetapostExpr) return color;
     if (color in MetapostExpr.colorMap) return MetapostExpr.colorMap[color];
+    if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
     throw 'Unknown color: ' + color;
   }
 
@@ -240,6 +245,7 @@ function isLeaf(block) {
       if (sfig.isNumber(this.func)) return parseFloat(this.func.toFixed(5));  // Round (Metapost can't handle scientific notation 1e-7)
       return this.func;
     }
+    if (this.func == 'mediation') return this.args[0] + '[' + this.args[1] + ',' + this.args[2] + ']';
     if (this.func == 'pair' || this.func == 'color') return '(' + this.args.join(',') + ')';
     if (this.func == 'path') return '(' + this.args.join('') + ')';
     //if (this.func in drawFuncs) return '(' + this.func + ' ' + this.args.join(' ') + ')';
@@ -482,6 +488,7 @@ function isLeaf(block) {
   }
 
   sfig.Block.prototype.drawPath = function(writer, path) {
+    var origPath = path;
     this.path = path = writer.storeIfComplex(path);
     var strokeColor = this.strokeColor().get();
     var fillColor = this.fillColor().get();
@@ -511,6 +518,30 @@ function isLeaf(block) {
         this.pic = writer.store(sfig.MetapostExpr.drawarrow(path, getDrawOptions(this)));
       else  // No arrow
         this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
+
+      // If arrows are thick, the bounding box doesn't contain the entire arrow,
+      // so we have to manually increase the bounding box.
+      if (d1 || d2) {
+        var p1 = origPath.args[0], sep = origPath.args[1], p2 = origPath.args[2];
+        var newp1 = p1, newp2 = p2;
+        var xsq = p1.x().sub(p2.x()).square();
+        var ysq = p1.y().sub(p2.y()).square();
+        var dist = xsq.add(ysq).sqrt();
+        dist = writer.storeIfComplex(dist);
+        // How much an arrow is going to spill over
+        var extraLength = this.strokeWidth().getOrDie() * 1.5;
+
+        if (d1) {
+          var d1frac = MetapostExpr.zero.sub(extraLength).div(dist);
+          newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
+        }
+        if (d2) {
+          var d2frac = dist.add(extraLength).div(dist);
+          newp2 = sfig.MetapostExpr.mediation(d2frac, p1, p2);
+        }
+        var expandedPath = sfig.MetapostExpr.path([newp1, sep, newp2]);
+        writer.setBounds(this.pic, expandedPath.bbox());
+      }
       return;
     }
     
@@ -579,6 +610,7 @@ function isLeaf(block) {
       path = writer.storeIfComplex(path);
       p2 = sfig.MetapostExpr.intersectionpoint(path, getBoundingPath(block.b2().get()));
     }
+    // TODO: if using a thick arrow, need to apply mediation to make sure tip lands exactly at p1 or p2.
     path = sfig.MetapostExpr.path([p1, sep, p2]);
     return path;
   }
@@ -824,9 +856,8 @@ function isLeaf(block) {
       // Note: multiply by some fudge factors to make the spacing more like SVG rather than rfig.
       'textyl := ypart lrcorner image(draw btex g etex) * 2;',
       'textyu := ypart urcorner image(draw btex l etex) * 1.5;',
-      // Make arrows sharp
-      'linejoin := mitered;',
-      'linecap := butt;',
+      'linejoin := mitered;',  // Make arrows sharp
+      'linecap := butt;',  // For thick lines, make a square end, rather than a round one
       'def hackTextBounds =',
       '  setbounds currentpicture to ((xpart llcorner currentpicture), min(ypart llcorner currentpicture, textyl))--',
       '                              ((xpart lrcorner currentpicture), min(ypart lrcorner currentpicture, textyl))--',

@@ -8,16 +8,18 @@ To get an overview of the functionality, point your web browser to:
     http://cs.stanford.edu/~pliang/sfig/examples/tutorial.html
 
 sfig works by itself, but you can readily incorporate third-party libraries.
-For example, sfig uses MathJax to render math.  You can download some of these
-packages:
+For example, sfig uses MathJax to render math.  To download these packages,
+type:
 
     ./download-packages
 
-If you want to create a presentation, start with the following as a template:
+If you want to create a presentation, type
 
-    examples/simple-presentation.html
+    ./create-presentation <name of presentation>
 
-In any sfig presentation, you can press '?' for help.
+Notes:
+* Type 'shift-f' to toggle between full screen mode.
+* Before you give a presentation, type 'shift-r' to pre-render all the slides.
 
 Currently, sfig has been tested with Chrome 21 and Firefox 15 on Linux and both
 work, although the math and animations work much better in Firefox due to a bug
