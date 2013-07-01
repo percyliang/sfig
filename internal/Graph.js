@@ -20,9 +20,9 @@
       if (typeof(p) == 'number') p = {y:p};
       else if (p instanceof Array) p = {x:p[0], y:p[1]};
       if (p.x == null) p.x = i+1;
-      if (p.y == null) throw 'No value specified in '+p;
-      if (!isFinite(p.x)) throw 'Bad x coordinate: ' + p.x;
-      if (!isFinite(p.y)) throw 'Bad x coordinate: ' + p.y;
+      if (p.y == null) sfig.throwException('No value specified in '+p);
+      if (!isFinite(p.x)) sfig.throwException('Bad x coordinate: ' + p.x);
+      if (!isFinite(p.y)) sfig.throwException('Bad y coordinate: ' + p.y);
       newTrajectory[i] = p;
     }
     return newTrajectory;
