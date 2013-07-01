@@ -17,7 +17,7 @@ cat <<EOF > $out/index.html
   <script src="sfig/internal/sfig.js"></script>
   <script src="sfig/internal/Graph.js"></script>
   <script src="sfig/internal/RootedTree.js"></script>
-  <script src="sfig/external/seedrandom.js"></script>
+  <script src="sfig/internal/seedrandom.js"></script>
   <script src="utils.js"></script>
   <script src="index.js"></script>
 </head>
@@ -87,7 +87,7 @@ require('./sfig/internal/sfig.js');
 require('./sfig/internal/Graph.js');
 require('./sfig/internal/RootedTree.js');
 require('./sfig/internal/metapost.js');
-require('./sfig/external/seedrandom.js');
+require('./sfig/internal/seedrandom.js');
 require('./utils.js');
 
 // Title slide
