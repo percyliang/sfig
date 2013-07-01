@@ -30,10 +30,10 @@ G = sfig.serverSide ? global : this;
 sfig.importAllMethods(G);
 
 // Latex macros
-sfig.latexMacro('R', 0, '\mathbb{R}');
-sfig.latexMacro('P', 0, '\mathbb{P}');
-sfig.latexMacro('E', 0, '\mathbb{E}');
-sfig.latexMacro('diag', 0, '\text{diag}');
+sfig.latexMacro('R', 0, '\\\\mathbb{R}');
+sfig.latexMacro('P', 0, '\\\\mathbb{P}');
+sfig.latexMacro('E', 0, '\\\\mathbb{E}');
+sfig.latexMacro('diag', 0, '\\\\text{diag}');
 
 sfig.initialize();
 
