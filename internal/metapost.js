@@ -529,7 +529,7 @@ function isLeaf(block) {
         var dist = xsq.add(ysq).sqrt();
         dist = writer.storeIfComplex(dist);
         // How much an arrow is going to spill over
-        var extraLength = this.strokeWidth().getOrDie() * 1.5;
+        var extraLength = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
 
         if (d1) {
           var d1frac = MetapostExpr.zero.sub(extraLength).div(dist);

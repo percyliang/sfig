@@ -19,7 +19,7 @@
       var p = trajectory[i];
       if (typeof(p) == 'number') p = {y:p};
       else if (p instanceof Array) p = {x:p[0], y:p[1]};
-      if (p.x == null) p.x = i;
+      if (p.x == null) p.x = i+1;
       if (p.y == null) throw 'No value specified in '+p;
       if (!isFinite(p.x)) throw 'Bad x coordinate: ' + p.x;
       if (!isFinite(p.y)) throw 'Bad x coordinate: ' + p.y;
@@ -132,7 +132,7 @@
         // Draw the tick label
         var tickLabel = null;
         if (tickLabels != null) {
-          tickLabel = tickLabel[i];
+          tickLabel = tickLabels[i];
         } else if (tickLabelFormat == 'reg') {
           tickLabel = displayValue.toFixed(roundPlaces);
         } else if (tickLabelFormat == 'pow' || tickLabelFormat == 'sci') {
@@ -181,7 +181,7 @@
         if (axis == 0)
           this.axisLabelBlock.pivot(0, -1).shift(length / 2, axisLabelPadding);
         else
-          this.axisLabelBlock.pivot(1, 0).shift(-axisLabelPadding, -length / 2);
+          this.axisLabelBlock.pivot(1, 0).shiftBy(-axisLabelPadding, -length / 2);
         this.addChild(this.axisLabelBlock);
       }
     }
@@ -257,6 +257,10 @@
   sfig_.addPairProperty(Graph, 'axisLabel', 'xaxisLabel', 'yaxisLabel', null, null, 'Labels of the axes');
   sfig_.addPairProperty(Graph, 'axisLabelPadding', 'xaxisLabelPadding', 'yaxisLabelPadding', 35, 35, 'How much space to put between the axis label and the tick labels');
   sfig_.addPairProperty(Graph, 'legendPivot', 'xlegendPivot', 'ylegendPivot', null, null, 'Where to put the legend');
+
+  // Marker
+  sfig_.addProperty(Graph, 'marker', null, 'Function mapping trajectory to a marker object');
+  sfig_.addProperty(Graph, 'markerSize', null, 'How big should the marker be?');
 })();
 
 ////////////////////////////////////////////////////////////
@@ -267,8 +271,6 @@
   }
   sfig_.inheritsFrom('LineGraph', LineGraph, sfig.Graph);
 
-  sfig_.addProperty(LineGraph, 'marker', null, 'Function mapping trajectory to a marker object');
-  sfig_.addProperty(LineGraph, 'markerSize', null, 'How big should the marker be?');
   sfig_.addProperty(LineGraph, 'markerPeriod', 2, 'Number of points between successive markers');
   sfig_.addProperty(LineGraph, 'lineWidth', 2, 'Width of lines');
 
@@ -315,13 +317,53 @@
 })();
 
 ////////////////////////////////////////////////////////////
-// BarGraph TODO
+// BarGraph
+// Given trajectories, create a group, one for each time point.
 
 (function() {
   var BarGraph = sfig.BarGraph = function(trajectories) {
     BarGraph.prototype.constructor.call(this, trajectories);
   }
   sfig_.inheritsFrom('BarGraph', BarGraph, sfig.Graph);
+
+  sfig_.addProperty(BarGraph, 'barWidth', 10, 'Bar width');
+  sfig_.addProperty(BarGraph, 'innerBarSpacing', 2, 'Spacing between bars in a groups');
+  sfig_.addProperty(BarGraph, 'outerBarSpacing', 2, 'Spacing between groups');
+
+  BarGraph.prototype.createDataChildren = function() {
+    var self = this;
+
+    var trajectoryNames = this.trajectoryNames().get() || [];
+    var trajectoryColors = this.trajectoryColors().get() || [];
+    var barWidth = this.barWidth().getOrDie();
+    var innerBarSpacing = this.innerBarSpacing().getOrDie();
+    var outerBarSpacing = this.outerBarSpacing().getOrDie();
+
+    var groupWidth = barWidth * this.trajectories.length + innerBarSpacing * (this.trajectories.length+1) + outerBarSpacing;
+
+    for (var i = 0; i <= this.trajectories.length; i++) {
+      // Add property changers
+      (this.propertyChangers[i] || []).forEach(function(changer) { self.addChild(changer); });
+      if (i == this.trajectories.length) break;
+
+      var trajectory = this.trajectories[i];
+
+      var group = 0;
+      // TODO: handle multiple trajectories
+      trajectory.forEach(function(p) {
+        var x = self.xvalueToCoord(p.x);
+        // Corners
+        var q0 = [x - barWidth/2, self.yvalueToCoord(self.yminValue().getOrDie())];
+        var q1 = [x + barWidth/2, self.yvalueToCoord(p.y)];
+
+        // Create bar
+        var bar = polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
+        bar.tooltip(p.x + ',' + p.y);
+        self.addChild(bar);
+        group++;
+      });
+    }
+  };
 
   sfig.barGraph = function() { return new sfig.BarGraph(arguments); }
 })();
