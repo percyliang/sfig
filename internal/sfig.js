@@ -98,6 +98,20 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.isString = function(x) { return typeof(x) == 'string'; }
   sfig.isFunction = function(x) { return typeof(x) == 'function'; }
 
+  sfig.isUpperCase = function(x) {
+    for (var i = 0; i < x.length; i++)
+      if (!(x[i] >= 'A' && x[i] <= 'Z'))
+        return false;
+    return true;
+  }
+  sfig.smallCaps = function(s) {
+    return s.toUpperCase();  // For now, the best we can do because s could be embedded in math.
+    /*var t = '';
+    for (var i = 0; i < s.length; i++)
+      t += sfig.isUpperCase(s[i]) ? s[i] : s[i].toUpperCase().fontsize('smaller');
+    return t;*/
+  }
+
   // Shorthand methods for debugging
   sfig.L = function() {
     if (arguments.length == 1)
@@ -1473,11 +1487,18 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (sfig.isString(content)) content = [null, content];
       content = Text.bulletize(content);
     }
+
+    // Need backslashes for LaTeX; strip them here.
+    content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
+    var m;
+    while (m = content.match(/^(.*)\\textsc{([^}]+)}(.*)$/)) {
+      content = m[1] + smallCaps(m[2]) + m[3];
+    }
+
     div.appendChild(sfig_.ensureHTMLElement(content));
 
     var font = this.font().getOrDie();
     var fontSize = this.fontSize().getOrDie();
-    var content = this.content().getOrDie();
 
     // Put div in foreignObject for SVG
     var elem = sfig_.newSvgElem('foreignObject');
@@ -2863,18 +2884,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
       window.location.reload();
     });
 
-    /*this.registerKey('Change display mode', ['shift-m'], function(callback) {
-      var mode = prompt('Current mode is \''+(sfig_.urlParams.mode || '')+'\', enter new mode (\'print\', \'outline\', \'fullScreen\', or \'\'):');
-      if (mode == 'p') mode = 'print';
-      else if (mode == 'o') mode = 'outline';
-      else if (mode == 'f') mode = 'fullScreen';
-      if (mode != null) {
-        sfig_.urlParams.mode = mode;
-        sfig_.serializeUrlParamsToLocation();
-        window.location.reload();
-      }
-    });*/
-
     this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {
       if (!self.readyForSlideShowKey()) return callback();
       sfig_.performOperation('renderAll', function(modifiedCallback) {
@@ -3318,10 +3327,23 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.latexMacros[name] = [arity, body];
   }
 
-  sfig.readFile = function() { sfig.throwException('Not supported'); }
+  // Note: this requires cross origin scripting
+  // For Chrome, either of the following will do the trick:
+  //   google-chrome -–allow-file-access-from-files
+  //   google-chrome --disable-web-security
+  sfig.readFile = function(path) {
+    sfig.L('readFile: ' + path);
+    var request = new XMLHttpRequest();
+    var response = null;
+    request.onload = function() {
+      response = this.responseText;
+    }
+    request.open('GET', path, false);
+    request.send();
+    return response;
+  }
 
   sfig.includeLatex = function(path) {
-    sfig.L(sfig.readFile(path));
     sfig.readFile(path).split(/\n/).forEach(sfig.parseLatex);
   }
 

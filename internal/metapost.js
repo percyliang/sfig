@@ -371,9 +371,6 @@ function isLeaf(block) {
     return content;
   }
 
-  function computeAutowrap(text) {
-  }
-
   sfig.Text.prototype.drawMetapost = function(writer) {
     var content = this.content().get();
 
@@ -386,6 +383,7 @@ function isLeaf(block) {
       // We must use minipage for itemize, but also allows us to do wrapping.
       content = bulletizeLatex(content);
     }
+    content = content.toString();
 
     var strippedContent = content.replace(/<[^>]+>/g, '');
 
