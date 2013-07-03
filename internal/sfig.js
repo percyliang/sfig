@@ -1489,10 +1489,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
 
     // Need backslashes for LaTeX; strip them here.
-    content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
-    var m;
-    while (m = content.match(/^(.*)\\textsc{([^}]+)}(.*)$/)) {
-      content = m[1] + smallCaps(m[2]) + m[3];
+    if (sfig.isString(content)) {
+      // TODO: do the replacement inside the HtmlDivElement as well
+      content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
+      var m;
+      while (m = content.match(/^(.*)\\textsc{([^}]+)}(.*)$/)) {
+        content = m[1] + smallCaps(m[2]) + m[3];
+      }
     }
 
     div.appendChild(sfig_.ensureHTMLElement(content));
@@ -3405,34 +3408,48 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
 
     if (sfig.enableMath) {
-      var script = sfig_.includeScript(sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default');
-      var buf = '';
-      buf += 'MathJax.Hub.Config({';
-      // TODO: want to remove this condition and not use the SVG jax, but there are problems.
-      // Chrome:
-      //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
-      //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
-      // Firefox:
-      //   - normal: works great, except when we print from this, the text is completely mis-aligned.
-      //   - jax=SVG: only needed for printing.
-      if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
-      buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
-      buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
-      buf += '  TeX: { Macros: {';
-      for (var name in sfig_.latexMacros) {
-        var arityBody = sfig_.latexMacros[name];
-        var arity = arityBody[0];
-        var value = arityBody[1];
-        value = value.replace(/\\/g, '\\\\');
-        value = value.replace(/'/g, '\\\'');
-        buf += name + ': [\'' + value + '\', ' + arity + '],';
-      }
-      buf += '  } }';
-      buf += '});';
-      script.innerHTML = buf;
+      sfig_.initMathJax(
+        sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default',
+        'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default'
+      );
     }
 
     sfig_.initialized = true;
+  }
+  
+  sfig_.initMathJax = function(scriptLocation, fallbackScriptLocation) {
+    var script = sfig_.includeScript(scriptLocation);
+    var buf = '';
+    buf += 'MathJax.Hub.Config({';
+    // TODO: want to remove this condition and not use the SVG jax, but there are problems.
+    // Chrome:
+    //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
+    //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
+    // Firefox:
+    //   - normal: works great, except when we print from this, the text is completely mis-aligned.
+    //   - jax=SVG: only needed for printing.
+    if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
+    buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
+    buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
+    buf += '  TeX: { Macros: {';
+    for (var name in sfig_.latexMacros) {
+      var arityBody = sfig_.latexMacros[name];
+      var arity = arityBody[0];
+      var value = arityBody[1];
+      value = value.replace(/\\/g, '\\\\');
+      value = value.replace(/'/g, '\\\'');
+      buf += name + ': [\'' + value + '\', ' + arity + '],';
+    }
+    buf += '  } }';
+    buf += '});';
+    script.innerHTML = buf;
+
+    // If fail, try the fallback location
+    script.onerror = function() {
+      sfig.L('Failed to load ' + scriptLocation + ', trying ' + fallbackScriptLocation);
+      if (fallbackScriptLocation)
+        sfig_.initMathJax(fallbackScriptLocation, null);
+    }
   }
 
   sfig_.currPresentationName = function() {
