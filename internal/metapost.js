@@ -1026,6 +1026,7 @@ function isLeaf(block) {
       if (error) {
         console.log(task.name + ': ' + error.toString());
         console.log(stdout);
+        process.exit(1);  // Task failed - exit code 1
       } else {
         self.run();
       }
