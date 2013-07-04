@@ -1489,13 +1489,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
 
     // Need backslashes for LaTeX; strip them here.
+    // TODO: do the replacement inside the HtmlDivElement as well
     if (sfig.isString(content)) {
-      // TODO: do the replacement inside the HtmlDivElement as well
       content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
-      var m;
-      while (m = content.match(/^(.*)\\textsc{([^}]+)}(.*)$/)) {
-        content = m[1] + smallCaps(m[2]) + m[3];
-      }
     }
 
     div.appendChild(sfig_.ensureHTMLElement(content));
@@ -3330,6 +3326,17 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.latexMacros[name] = [arity, body];
   }
 
+  // Some default ones
+  var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
+  sfig.latexMacro('red', 1, '\\'+colorCmd+'{red}{#1}');
+  sfig.latexMacro('blue', 1, '\\'+colorCmd+'{blue}{#1}');
+  sfig.latexMacro('green', 1, '\\'+colorCmd+'{green}{#1}');
+  sfig.latexMacro('darkblue', 1, '\\'+colorCmd+'{darkblue}{#1}');
+  if (sfig.serverSide) {
+    // TODO: macros aren't nested unfortunately
+    sfig.latexMacro('footnotesize', 1, '#1');
+  }
+
   // Note: this requires cross origin scripting
   // For Chrome, either of the following will do the trick:
   //   google-chrome -–allow-file-access-from-files
@@ -3361,13 +3368,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (m) return sfig.latexMacro(m[1], parseInt(m[2]), m[3]);
     sfig.throwException('Invalid LaTeX: ' + line);
   }
-
-  // Some default ones
-  var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
-  sfig.latexMacro('red', 1, '\\'+colorCmd+'{red}{#1}');
-  sfig.latexMacro('blue', 1, '\\'+colorCmd+'{blue}{#1}');
-  sfig.latexMacro('green', 1, '\\'+colorCmd+'{green}{#1}');
-  sfig.latexMacro('darkblue', 1, '\\'+colorCmd+'{darkblue}{#1}');
 
   sfig_.includeScript = function(src) {
     var head = document.head;
