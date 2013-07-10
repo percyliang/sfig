@@ -5,7 +5,7 @@
   // A RootedTreeBranch contains an edge and a child.
   var RootedTreeBranch = sfig.RootedTreeBranch = function(edgeLabel, child) {
     this.edgeLabel = edgeLabel != null ? sfig.std(edgeLabel) : null;
-    if (child == null) throw 'No child: '+child;
+    if (child == null) sfig.throwException('No child: '+child);
     this.child = (child instanceof sfig.RootedTree) ? child : sfig.rootedTree(child);
     this.edge = new sfig.DecoratedLine(); // No arrows, end points set later
     this.edge.setEnd(this);
@@ -41,17 +41,17 @@
       } else if (item instanceof sfig.PropertyChanger) {
         children.push(item);
       } else {
-        throw 'Not RootedTreeBranch or Block: '+item;
+        sfig.throwException('Not RootedTreeBranch or Block: '+item);
       }
     }
     if (this.branches.length > 0)
       this.childrenBlock = sfig.table(children).xmargin(this.xmargin());
     else if (children.length != 0)
-      throw 'Can\'t have children without actual branches';
+      sfig.throwException('Can\'t have children without actual branches');
 
     // Head
     this.head = items[0];
-    if (!(this.head instanceof sfig.Block)) throw 'Head must be Block, but got: '+this.head;
+    if (!(this.head instanceof sfig.Block)) sfig.throwException('Head must be Block, but got: '+this.head);
 
     // Center the head in the middle between center of the first and the last children heads
     this.headBox = frame(this.head).bg.round(this.nodeRound()).end;

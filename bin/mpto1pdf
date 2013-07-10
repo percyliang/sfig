@@ -39,6 +39,10 @@ else
   out=/dev/stdout
 fi
 
+# Hack: copy fmt file to the right place.
+mkdir -p $HOME/.texmf-var/web2c || exit 1
+cp $bindir/mptopdf.fmt $HOME/.texmf-var/web2c || exit 1
+
 mkdir $tmp || exit 1 # Create temporary directory
 (
   cd $tmp || exit 1
@@ -56,9 +60,9 @@ mkdir $tmp || exit 1 # Create temporary directory
   # Stupid mptopdf does not return exit code 1 if it fails
   # But ls $p-*.pdf should fail
   if [ $quiet == 1 ]; then
-    mptopdf -metafun $p.mp < /dev/null >> $out 2>&1 || (echo ==================================================; cat $out $p.tmp/mpxerr.log; exit 1)
+    $bindir/mptopdf -metafun $p.mp < /dev/null >> $out 2>&1 || (echo ==================================================; cat $out $p.tmp/mpxerr.log; exit 1)
   else
-    mptopdf -metafun $p.mp || exit 1
+    $bindir/mptopdf -metafun $p.mp || exit 1
   fi
 
   # Join pdf files

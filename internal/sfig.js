@@ -51,7 +51,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.importMethods = function(target, names) {
     names.forEach(function(name) {
       var method = sfig[name];
-      if (method == null) throw 'Can\'t import '+name+' because it doesn\'t exist';
+      if (method == null) sfig.throwException('Can\'t import '+name+' because it doesn\'t exist');
       target[name] = method;
     });
   }
@@ -98,6 +98,20 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.isString = function(x) { return typeof(x) == 'string'; }
   sfig.isFunction = function(x) { return typeof(x) == 'function'; }
 
+  sfig.isUpperCase = function(x) {
+    for (var i = 0; i < x.length; i++)
+      if (!(x[i] >= 'A' && x[i] <= 'Z'))
+        return false;
+    return true;
+  }
+  sfig.smallCaps = function(s) {
+    return s.toUpperCase();  // For now, the best we can do because s could be embedded in math.
+    /*var t = '';
+    for (var i = 0; i < s.length; i++)
+      t += sfig.isUpperCase(s[i]) ? s[i] : s[i].toUpperCase().fontsize('smaller');
+    return t;*/
+  }
+
   // Shorthand methods for debugging
   sfig.L = function() {
     if (arguments.length == 1)
@@ -143,14 +157,19 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // Arguments which are not Blocks, but are kept in tact during standarization.
   sfig.AuxiliaryInfo = function() { }
 
+  sfig.throwException = function(message) {
+    console.log(new Error().stack); 
+    throw message;
+  }
+
   // Standardize arguments.  sfig functions that take a tree of Blocks are
   // sometimes passed with _'s and raw strings.  Remove all instances of _, and
   // make sure every item is either an Block, a PropertyChanger, AuxiliaryInfo, or
   // an array of these things.
   sfig.std = function(item) {
-    if (item == null) throw 'Null not allowed';
-    if (item instanceof Function) throw 'Function not allowed (did you mean to call it?): '+item;
-    if (item instanceof sfig.Thunk) throw 'Thunk not allowed: '+item;
+    if (item == null) { sfig.throwException('Null not allowed'); }
+    if (item instanceof Function) sfig.throwException('Function not allowed (did you mean to call it?): '+item);
+    if (item instanceof sfig.Thunk) sfig.throwException('Thunk not allowed: '+item);
     if (item instanceof sfig.Block) return item;
     if (item instanceof sfig.AuxiliaryInfo) return item;
     if (item instanceof sfig.PropertyChanger) return item;
@@ -168,7 +187,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       return newList;
     }
     console.log(item);
-    throw 'Invalid: '+item;
+    sfig.throwException('Invalid: ' + item);
   }
 
   sfig_.javascriptEscape = function(s) { return '\'' + s.replace(/'/g, '\\\'') + '\''; }
@@ -424,7 +443,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Compute value if it doesn't exist.
     if (this.value == null && this.func != null) {
       this.value = this.func.apply(null, this.args.map(function(arg) { return arg.get(); }));
-      if (this.value instanceof sfig.Thunk) throw 'Value is thunk: '+this.value;
+      if (this.value instanceof sfig.Thunk) sfig.throwException('Value is thunk: '+this.value);
       if (this.hookFunc != null) this.hookFunc(this.name, this.value);
     }
     return this.value;
@@ -439,7 +458,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var self = this;
       this.args.forEach(function(arg) {
         var i = arg.usedBy.indexOf(self);
-        if (i == -1) throw 'Inconsistent state';
+        if (i == -1) sfig.throwException('Inconsistent state');
         arg.usedBy.splice(i, 1);
       });
     }
@@ -473,13 +492,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Thunk.prototype.getOrDie = function() {
     var value = this.get();
-    if (value == null) throw 'Null value from '+this+' (maybe not available if Block isn\'t rendered yet)';
+    if (value == null) sfig.throwException('Null value from '+this+' (maybe not available if Block isn\'t rendered yet)');
     return value;
   }
 
   Thunk.prototype.getNonnegativeOrDie = function() {
     var value = this.getOrDie();
-    if (!(value >= 0)) throw 'Negative value from '+this+': '+value;
+    if (!(value >= 0)) sfig.throwException('Negative value from '+this+': '+value);
     return value;
   }
 
@@ -490,7 +509,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   sfig.tvalue = function(name, value) {
-    if (value instanceof Thunk) throw 'Value can\'t be thunk: '+value;
+    if (value instanceof Thunk) sfig.throwException('Value can\'t be thunk: '+value);
     var thunk = new Thunk();
     thunk.name = name;
     thunk.value = value;
@@ -577,7 +596,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   Properties.prototype.setEnd = function(block) {
-    if (this.end != null) throw this+' already has end: '+this.end+', but tried to set to '+block;
+    if (this.end != null) sfig.throwException(this+' already has end: '+this.end+', but tried to set to '+block);
     this.end = block;
   }
 
@@ -592,7 +611,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Properties.prototype.setProperty = function(name, newValue) {
     var v = this.properties[name];
     if (v == null) v = this.properties[name] = sfig.tvalue(name, null);
-    if (newValue == null) throw 'Can\'t set '+name+' to null';
+    if (newValue == null) sfig.throwException('Can\'t set '+name+' to null');
     v.set(newValue);
     return this;
   }
@@ -608,26 +627,26 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Add property with given name to the given class |constructor|.
   sfig_.addProperty = function(constructor, name, defaultValue, description) {
-    if (arguments.length != 4) throw 'Wrong number of arguments: '+Array.prototype.slice.call(arguments);
+    if (arguments.length != 4) sfig.throwException('Wrong number of arguments: '+Array.prototype.slice.call(arguments));
     if (defaultValue != null) constructor.defaults.setProperty(name, defaultValue);
 
-    if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
+    if (constructor.prototype[name]) sfig.throwException(constructor.prototype.className+' already has property '+name);
     constructor.prototype[name] = function(newValue) {
       if (arguments.length == 0) {
         return this.getProperty(name);
       } else if (arguments.length == 1) {
         return this.setProperty(name, newValue);
       } else
-        throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
+        sfig.throwException('Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments));
     }
   }
 
   // Add property with given name to the given class |constructor|.
   sfig_.addMapProperty = function(constructor, name, defaultValue, description) {
-    if (arguments.length != 4) throw 'Wrong number of arguments: '+Array.prototype.slice.call(arguments);
+    if (arguments.length != 4) sfig.throwException('Wrong number of arguments: '+Array.prototype.slice.call(arguments));
     if (defaultValue != null) constructor.defaults.setProperty(name, defaultValue);
 
-    if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
+    if (constructor.prototype[name]) sfig.throwException(constructor.prototype.className+' already has property '+name);
     constructor.prototype[name] = function(key, newValue) {
       if (arguments.length == 0) {
         return this.getProperty(name);
@@ -637,7 +656,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
         map[key] = newValue;
         return this.setProperty(name, map);
       } else {
-        throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
+        sfig.throwException('Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments));
       }
     }
   }
@@ -645,10 +664,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // Add property with given names to the given class |constructor|.
   // |name| is a pair property (e.g., shift) which modifies the same variables as |name1| and |name2|.
   sfig_.addPairProperty = function(constructor, name, name1, name2, defaultValue1, defaultValue2, description) {
-    if (arguments.length != 7) throw 'Wrong number of arguments: '+Array.prototype.slice.call(arguments);
-    if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
-    if (constructor.prototype[name1]) throw constructor.prototype.className+' already has property '+name1;
-    if (constructor.prototype[name2]) throw constructor.prototype.className+' already has property '+name2;
+    if (arguments.length != 7) sfig.throwException('Wrong number of arguments: '+Array.prototype.slice.call(arguments));
+    if (constructor.prototype[name]) sfig.throwException(constructor.prototype.className+' already has property '+name);
+    if (constructor.prototype[name1]) sfig.throwException(constructor.prototype.className+' already has property '+name1);
+    if (constructor.prototype[name2]) sfig.throwException(constructor.prototype.className+' already has property '+name2);
 
     if (defaultValue1 != null) constructor.defaults.setProperty(name1, defaultValue1);
     if (defaultValue2 != null) constructor.defaults.setProperty(name2, defaultValue2);
@@ -661,7 +680,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       } else if (arguments.length == 2) { // Setter ...property(2, 3)
         return this.setProperty(name1, newValue1) && this.setProperty(name2, newValue2);
       } else {
-        throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
+        sfig.throwException('Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments));
       }
     }
     constructor.prototype[name1] = function(newValue1) {
@@ -670,7 +689,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       } else if (arguments.length == 1) { // Setter
         return this.setProperty(name1, newValue1);
       } else {
-        throw 'Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments);
+        sfig.throwException('Wrong number of arguments to '+name+': '+Array.prototype.slice.call(arguments));
       }
     }
     constructor.prototype[name2] = function(newValue2) {
@@ -679,17 +698,17 @@ sfig.down = function(x) { return x * sfig.downSign; };
       } else if (arguments.length == 1) { // Setter
         return this.setProperty(name2, newValue2);
       } else {
-        throw 'Wrong number of arguments to '+name2+': '+arguments;
+        sfig.throwException('Wrong number of arguments to '+name2+': '+arguments);
       }
     }
   }
 
   // Add a read-only property which is only available after .
   sfig_.addDerivedProperty = function(constructor, name, func, argNames, description) {
-    if (constructor.prototype[name]) throw constructor.prototype.className+' already has property '+name;
+    if (constructor.prototype[name]) sfig.throwException(constructor.prototype.className+' already has property '+name);
     constructor.prototype[name] = function() {
       if (arguments.length != 0)
-        throw 'Derived property '+name+' is read-only, unable to set to '+Array.prototype.slice.call(arguments);
+        sfig.throwException('Derived property '+name+' is read-only, unable to set to '+Array.prototype.slice.call(arguments));
       var v = this.properties[name];
       if (v == null) {
         // Compute and cache the result.
@@ -701,7 +720,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   sfig_.removeProperty = function(constructor, name) {
-    if (!constructor.prototype[name]) throw constructor.prototype.className+' doesn\'t have property '+name;
+    if (!constructor.prototype[name]) sfig.throwException(constructor.prototype.className+' doesn\'t have property '+name);
     delete constructor.prototype[name];
   }
 })();
@@ -768,23 +787,23 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   Block.prototype.ensureRendered = function() {
-    if (this.elem == null) throw 'Not rendered yet: ' + this.toString(true);
+    if (this.elem == null) sfig.throwException('Not rendered yet: ' + this.toString(true));
   }
 
   Block.prototype.addInitDependency = function(item) {
     if (item instanceof sfig.Block) {
       this.initDependencies.push(item);
     } else {
-      throw 'Invalid: '+item;
+      sfig.throwException('Invalid: '+item);
     }
   }
 
   Block.prototype.addChild = function(item) {
     if (item instanceof sfig.Block) {
       item.freeze();  // When child is added, its properties are frozen
-      if (this.children == null) throw 'Children not initialized yet for '+item;
+      if (this.children == null) sfig.throwException('Children not initialized yet for '+item);
       this.children.push(item);
-      if (item.parent != null) throw 'Already has parent, trying to give another: '+item;
+      if (item.parent != null) sfig.throwException('Already has parent, trying to give another: '+item);
       item.parent = this;
       if (!item.showLevel().exists()) {  // Only propagate to/from item if its level is specified
         // env -> item
@@ -795,7 +814,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     } else if (item instanceof sfig.PropertyChanger) {
       item.operation(this.env);
     } else {
-      throw 'Invalid: '+item;
+      sfig.throwException('Invalid: '+item);
     }
   }
 
@@ -1065,7 +1084,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       } else {  // Recursive case
         var x0, y0, x1, y1;
         this.children.forEach(function(child) {
-          if (child.elem == null) throw 'Child not rendered: '+child;
+          if (child.elem == null) sfig.throwException('Child not rendered: '+child);
           if (!child.orphan().get()) {
             x0 = sfig_.robustMin(x0, child.left().get());
             y0 = sfig_.robustMin(y0, child.top().get());
@@ -1230,7 +1249,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Block.prototype.renderElem = function(state, callback) {
     var group = sfig_.newSvgElem('g');
     this.children.forEach(function(block) {
-      if (block.elem == null) throw 'No elem for '+block;
+      if (block.elem == null) sfig.throwException('No elem for '+block);
       group.appendChild(block.elem);
     });
     this.elem = group;
@@ -1238,7 +1257,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   Block.prototype.postRender = function(state) {
-    if (this.elem == null) throw 'renderElem didn\'t return anything: '+this;
+    if (this.elem == null) sfig.throwException('renderElem didn\'t return anything: '+this);
     this.setStrokeFillProperties(this.elem, true);
     this.applyTransforms(state);
 
@@ -1284,14 +1303,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var showLevel = this.showLevel().get();
     var hideLevel = this.hideLevel().get();
     if (showLevel != null) {
-      if (!sfig.isNumber(showLevel)) throw 'showLevel is not a number: ' + showLevel;
+      if (!sfig.isNumber(showLevel)) sfig.throwException('showLevel is not a number: ' + showLevel);
       if (showLevel != -1) {
         sfig_.vectorPushInto(state.showBlocks, showLevel, this);
         if (this.hasAnimation) sfig_.vectorPushInto(state.animateBlocks, showLevel, this);
       }
     }
     if (hideLevel != null) {
-      if (!sfig.isNumber(hideLevel)) throw 'hideLevel is not a number: ' + hideLevel;
+      if (!sfig.isNumber(hideLevel)) sfig.throwException('hideLevel is not a number: ' + hideLevel);
       if (hideLevel != -1) sfig_.vectorPushInto(state.hideBlocks, hideLevel, this);
     }
   }
@@ -1468,11 +1487,17 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (sfig.isString(content)) content = [null, content];
       content = Text.bulletize(content);
     }
+
+    // Need backslashes for LaTeX; strip them here.
+    // TODO: do the replacement inside the HtmlDivElement as well
+    if (sfig.isString(content)) {
+      content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
+    }
+
     div.appendChild(sfig_.ensureHTMLElement(content));
 
     var font = this.font().getOrDie();
     var fontSize = this.fontSize().getOrDie();
-    var content = this.content().getOrDie();
 
     // Put div in foreignObject for SVG
     var elem = sfig_.newSvgElem('foreignObject');
@@ -1646,7 +1671,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     str = '<svg xmlns="'+sfig_.svgns+'" verison="1.1"><g>' + str + '</g></svg>';
     div.innerHTML = str;
     var svg = div.firstChild;
-    if (svg.childElementCount != 1) throw 'Expected one element, but got '+div;
+    if (svg.childElementCount != 1) sfig.throwException('Expected one element, but got '+div);
     return svg.firstChild;
   }
 
@@ -1987,13 +2012,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Line.prototype.arg1 = function(arg1) {
     if (arg1 instanceof Array) this.p1(arg1[0], arg1[1]);
     else if (arg1 instanceof sfig.Block) this.b1(arg1);
-    else throw 'Bad arg1: ' + arg1;
+    else sfig.throwException('Bad arg1: ' + arg1);
     return this;
   }
   Line.prototype.arg2 = function(arg2) {
     if (arg2 instanceof Array) this.p2(arg2[0], arg2[1]);
     else if (arg2 instanceof sfig.Block) this.b2(arg2);
-    else throw 'Bad arg2: ' + arg2;
+    else sfig.throwException('Bad arg2: ' + arg2);
     return this;
   }
 
@@ -2113,10 +2138,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
         var vy = p3[1] - p2[1];
         var u_mag = Math.sqrt(ux*ux + uy*uy); ux /= u_mag; uy /= u_mag;
         var v_mag = Math.sqrt(vx*vx + vy*vy); vx /= v_mag; vy /= v_mag;
-        if (!(u_mag > 0) || !(v_mag > 0)) throw 'Duplicate points: '+u_mag+' '+v_mag;
+        if (!(u_mag > 0) || !(v_mag > 0)) sfig.throwException('Duplicate points: '+u_mag+' '+v_mag);
         var cos_2a = ux*vx + uy*vy;
         var sin_a = Math.sin(Math.acos(cos_2a)/2);
-        if (sin_a == 0) throw 'Collinear points';
+        if (sin_a == 0) sfig.throwException('Collinear points');
         var len = (strokeWidth/2) / sin_a;  // How much to extend p2 -> q2
         //sfig.L(strokeWidth/2, Math.acos(cos_2a)*180/Math.PI/2, len);
         // w is direction to grow
@@ -2287,7 +2312,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       } else if (item instanceof sfig.PropertyChanger) {
         self.addChild(item);
       } else {
-        throw 'Invalid: '+item;
+        sfig.throwException('Invalid: '+item);
       }
     });
   }
@@ -2385,17 +2410,17 @@ sfig.down = function(x) { return x * sfig.downSign; };
           } else if (x instanceof sfig.PropertyChanger) {
             this.items.push(x);
           } else {
-            throw 'Expected Block or PropertyChanger, but got: '+x;
+            sfig.throwException('Expected Block or PropertyChanger, but got: '+x);
           }
         }
         if (numCols == -1) numCols = c;
-        if (numCols != c) throw 'Each row must have the same number of columns, but row 0 has '+numCols+' while row '+(r+1)+' has '+c;
+        if (numCols != c) sfig.throwException('Each row must have the same number of columns, but row 0 has '+numCols+' while row '+(r+1)+' has '+c);
         c = 0;
         r++;
       } else if (item instanceof sfig.PropertyChanger) {
         this.items.push(item);
       } else {
-        throw 'Expected Array or PropertyChanger, but got: '+item;
+        sfig.throwException('Expected Array or PropertyChanger, but got: '+item);
       }
     }
     this.numCols = numCols;
@@ -2465,7 +2490,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (justify == 'l') return -1;
       if (justify == 'c') return 0;
       if (justify == 'r') return +1;
-      throw 'Invalid justify (expected l,c,r): '+justify;
+      sfig.throwException('Invalid justify (expected l,c,r): '+justify);
     }
 
     // To compute the bounding box (if there are orphan children)
@@ -2514,7 +2539,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Table.prototype.closeAppendices = function() {
     this.freeze();
     // Just don't do anything
-    //throw 'Not supported for tables';
   }
 
   Table.prototype.center = function() { return this.justify('c', 'c'); }
@@ -2639,7 +2663,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.explain = function(button, explanation, options) {
     if (options == null) options = {};
     var pivot = options.pivot;
-    if (pivot == null) throw 'Missing pivot';
+    if (pivot == null) sfig.throwException('Missing pivot');
 
     button = sfig.std(button);
     if (options.borderWidth)
@@ -2682,7 +2706,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Presentation.prototype.addSlide = function(slide) {
     slide = sfig.std(slide);
-    if (!(slide instanceof sfig.Block)) throw 'Slide must be Block, but got: '+slide;
+    if (!(slide instanceof sfig.Block)) sfig.throwException('Slide must be Block, but got: '+slide);
 
     if (slide instanceof sfig.Slide) {
       // Add slide index
@@ -2750,7 +2774,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Presentation.prototype.registerKey = function(description, keys, func) {
     var self = this;
     keys.forEach(function(key) {
-      if (self.keyMap[key]) throw 'Already registered key '+key;
+      if (self.keyMap[key]) sfig.throwException('Already registered key '+key);
       self.keyMap[key] = {description: description, func: func};
     });
     self.keyBindings.push({description: description, keys: keys});
@@ -2858,18 +2882,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
       sfig_.serializeUrlParamsToLocation();
       window.location.reload();
     });
-
-    /*this.registerKey('Change display mode', ['shift-m'], function(callback) {
-      var mode = prompt('Current mode is \''+(sfig_.urlParams.mode || '')+'\', enter new mode (\'print\', \'outline\', \'fullScreen\', or \'\'):');
-      if (mode == 'p') mode = 'print';
-      else if (mode == 'o') mode = 'outline';
-      else if (mode == 'f') mode = 'fullScreen';
-      if (mode != null) {
-        sfig_.urlParams.mode = mode;
-        sfig_.serializeUrlParamsToLocation();
-        window.location.reload();
-      }
-    });*/
 
     this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {
       if (!self.readyForSlideShowKey()) return callback();
@@ -2983,7 +2995,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     self.currSlideIndex = Math.min(slideIndex, self.slides.length-1);
     self.currLevel = -1;
     var slide = self.slides[self.currSlideIndex];
-    if (slide == null) throw 'Invalid slide index: '+self.currSlideIndex;
+    if (slide == null) sfig.throwException('Invalid slide index: '+self.currSlideIndex);
     self.container.appendChild(self.slides[self.currSlideIndex].state.svg);
 
     if (sfig_.urlParams.mode == 'fullScreen') slide.borderWidth(0);
@@ -3077,7 +3089,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (this.slides[i].id().get() == slideId)
         return i;
     }
-    throw 'No slide with id '+slideId;
+    sfig.throwException('No slide with id '+slideId);
   }
 
   Presentation.prototype.setSlideIdAndLevel = function(slideId, level, callback) {
@@ -3145,8 +3157,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var self = this;
     if (callback == null) callback = function() {};
 
-    if (this.slides.length == 0) throw 'No slides';
-    if (!sfig_.initialized) throw 'Must call sfig.initialize() first';
+    if (this.slides.length == 0) sfig.throwException('No slides');
+    if (!sfig_.initialized) sfig.throwException('Must call sfig.initialize() first');
 
     sfig_.performOperation('Presentation.run', function(modifiedCallback) {
       var mode = sfig_.urlParams.mode;
@@ -3157,7 +3169,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       else if (mode == 'fullScreen' || !mode)
         self.displaySlideShow(null, modifiedCallback);
       else
-        throw 'Invalid mode: '+mode;
+        sfig.throwException('Invalid mode: '+mode);
     }, callback);
 
     window.onhashchange = function() {
@@ -3310,7 +3322,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 (function() {
   sfig_.latexMacros = {};
   sfig.latexMacro = function(name, arity, body) {
-    if (sfig_.initialized) throw 'Can\'t add Latex macros after initialized';
+    if (sfig_.initialized) sfig.throwException('Can\'t add Latex macros after initialized');
     sfig_.latexMacros[name] = [arity, body];
   }
 
@@ -3320,6 +3332,42 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.latexMacro('blue', 1, '\\'+colorCmd+'{blue}{#1}');
   sfig.latexMacro('green', 1, '\\'+colorCmd+'{green}{#1}');
   sfig.latexMacro('darkblue', 1, '\\'+colorCmd+'{darkblue}{#1}');
+  if (sfig.serverSide) {
+    // TODO: macros aren't nested unfortunately
+    sfig.latexMacro('footnotesize', 1, '#1');
+  }
+
+  // Note: this requires cross origin scripting
+  // For Chrome, either of the following will do the trick:
+  //   google-chrome -–allow-file-access-from-files
+  //   google-chrome --disable-web-security
+  sfig.readFile = function(path) {
+    sfig.L('readFile: ' + path);
+    var request = new XMLHttpRequest();
+    var response = null;
+    request.onload = function() {
+      response = this.responseText;
+    }
+    request.open('GET', path, false);
+    request.send();
+    return response;
+  }
+
+  sfig.includeLatex = function(path) {
+    sfig.readFile(path).split(/\n/).forEach(sfig.parseLatex);
+  }
+
+  sfig.parseLatex = function(line) {
+    line = line.replace(/%.*$/, '');
+    line = line.replace(/^\s+/, '').replace(/\s+$/, '');
+    if (line == '') return;
+    var m;
+    m = line.match(/^\\newcommand\\(\w+)\{(.+)\}$/);
+    if (m) return sfig.latexMacro(m[1], 0, m[2]);
+    m = line.match(/^\\newcommand\\(\w+)\[(\d+)\]\{(.+)\}$/);
+    if (m) return sfig.latexMacro(m[1], parseInt(m[2]), m[3]);
+    sfig.throwException('Invalid LaTeX: ' + line);
+  }
 
   sfig_.includeScript = function(src) {
     var head = document.head;
@@ -3360,34 +3408,48 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
 
     if (sfig.enableMath) {
-      var script = sfig_.includeScript(sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default');
-      var buf = '';
-      buf += 'MathJax.Hub.Config({';
-      // TODO: want to remove this condition and not use the SVG jax, but there are problems.
-      // Chrome:
-      //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
-      //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
-      // Firefox:
-      //   - normal: works great, except when we print from this, the text is completely mis-aligned.
-      //   - jax=SVG: only needed for printing.
-      if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
-      buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
-      buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
-      buf += '  TeX: { Macros: {';
-      for (var name in sfig_.latexMacros) {
-        var arityBody = sfig_.latexMacros[name];
-        var arity = arityBody[0];
-        var value = arityBody[1];
-        value = value.replace(/\\/g, '\\\\');
-        value = value.replace(/'/g, '\\\'');
-        buf += name + ': [\'' + value + '\', ' + arity + '],';
-      }
-      buf += '  } }';
-      buf += '});';
-      script.innerHTML = buf;
+      sfig_.initMathJax(
+        sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default',
+        'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default'
+      );
     }
 
     sfig_.initialized = true;
+  }
+  
+  sfig_.initMathJax = function(scriptLocation, fallbackScriptLocation) {
+    var script = sfig_.includeScript(scriptLocation);
+    var buf = '';
+    buf += 'MathJax.Hub.Config({';
+    // TODO: want to remove this condition and not use the SVG jax, but there are problems.
+    // Chrome:
+    //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
+    //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
+    // Firefox:
+    //   - normal: works great, except when we print from this, the text is completely mis-aligned.
+    //   - jax=SVG: only needed for printing.
+    if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
+    buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
+    buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
+    buf += '  TeX: { Macros: {';
+    for (var name in sfig_.latexMacros) {
+      var arityBody = sfig_.latexMacros[name];
+      var arity = arityBody[0];
+      var value = arityBody[1];
+      value = value.replace(/\\/g, '\\\\');
+      value = value.replace(/'/g, '\\\'');
+      buf += name + ': [\'' + value + '\', ' + arity + '],';
+    }
+    buf += '  } }';
+    buf += '});';
+    script.innerHTML = buf;
+
+    // If fail, try the fallback location
+    script.onerror = function() {
+      sfig.L('Failed to load ' + scriptLocation + ', trying ' + fallbackScriptLocation);
+      if (fallbackScriptLocation)
+        sfig_.initMathJax(fallbackScriptLocation, null);
+    }
   }
 
   sfig_.currPresentationName = function() {

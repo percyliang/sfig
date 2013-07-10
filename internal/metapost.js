@@ -12,7 +12,7 @@
 var fs = require('fs');
 var Path = require('path');
 
-if (!sfig.serverSide) throw 'This script only works on the server side.';
+if (!sfig.serverSide) sfig.throwException('This script only works on the server side.');
 
 // In rendering Metapost, we only draw the leaves.
 function isLeaf(block) {
@@ -49,7 +49,7 @@ function isLeaf(block) {
       if (x instanceof Array) {
         if (x.length == 2) return MetapostExpr.pair(x);
         if (x.length == 3) return MetapostExpr.color(x);
-        throw 'Bad length: ' + x;
+        sfig.throwException('Bad length: ' + x);
       }
       if (sfig.isNumber(x))
         return MetapostExpr.numeric(x);
@@ -75,7 +75,7 @@ function isLeaf(block) {
   MetapostExpr.rgbcolor = function(r, g, b) { return MetapostExpr.color([r/255.0, g/255.0, b/255.0]); }
   MetapostExpr.hexcolor = function(s) {
     var m = s.match(/^#(..)(..)(..)$/);
-    if (!m) throw 'Invalid hex color: ' + s;
+    if (!m) sfig.throwException('Invalid hex color: ' + s);
     return MetapostExpr.color([parseInt(m[1], 16)/255.0, parseInt(m[2], 16)/255.0, parseInt(m[3], 16)/255.0]);
   }
   MetapostExpr.zero = MetapostExpr.numeric(0);
@@ -101,7 +101,7 @@ function isLeaf(block) {
   MetapostExpr.prototype.isPrimitiveNumber = function() { return this.isPrimitive() && sfig.isNumber(this.func); }
 
   MetapostExpr.prototype.getPrimitiveNumber = function() {
-    if (!this.isPrimitiveNumber()) throw 'Not primitive number: ' + this;
+    if (!this.isPrimitiveNumber()) sfig.throwException('Not primitive number: ' + this);
     return this.func;
   }
 
@@ -206,7 +206,7 @@ function isLeaf(block) {
     if (color instanceof MetapostExpr) return color;
     if (color in MetapostExpr.colorMap) return MetapostExpr.colorMap[color];
     if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
-    throw 'Unknown color: ' + color;
+    sfig.throwException('Unknown color: ' + color);
   }
 
   // Transformations of picture
@@ -218,7 +218,7 @@ function isLeaf(block) {
   MetapostExpr.prototype.yscale = function(yscale) { return new MetapostExpr(this.type, 'yscaled', [this, yscale]); }
   MetapostExpr.prototype.rotate = function(rotate) { return new MetapostExpr(this.type, 'rotated', [this, MetapostExpr.ensureNumeric(rotate).negate()]); }
 
-  MetapostExpr.prototype.assertType = function(type) { if (this.type != type) throw 'Expected type ' + type + ', but got type ' + this.type + '; value is ' + this; }
+  MetapostExpr.prototype.assertType = function(type) { if (this.type != type) sfig.throwException('Expected type ' + type + ', but got type ' + this.type + '; value is ' + this); }
   MetapostExpr.prototype.assertPair = function() { this.assertType('pair'); }
 
   MetapostExpr.prototype.x = function() {
@@ -294,7 +294,7 @@ function isLeaf(block) {
   sfig.Block.prototype.drawMetapost = function(writer) {
     var pic = writer.store(sfig.MetapostExpr.nullpicture);
     this.children.forEach(function(block) {
-      if (block.pic == null) throw 'No pic for '+block;
+      if (block.pic == null) sfig.throwException('No pic for '+block);
       writer.addToPicture(pic, block.pic);
     });
     this.pic = pic;
@@ -310,7 +310,7 @@ function isLeaf(block) {
     }
 
     this.drawMetapost(writer);
-    if (this.pic == null) throw 'pic not set by drawMetapost: ' + this;
+    if (this.pic == null) sfig.throwException('pic not set by drawMetapost: ' + this);
 
     // Unlike in SVG, which has a transform tag, we have to go in and manually
     // transform each child.
@@ -371,9 +371,6 @@ function isLeaf(block) {
     return content;
   }
 
-  function computeAutowrap(text) {
-  }
-
   sfig.Text.prototype.drawMetapost = function(writer) {
     var content = this.content().get();
 
@@ -386,6 +383,7 @@ function isLeaf(block) {
       // We must use minipage for itemize, but also allows us to do wrapping.
       content = bulletizeLatex(content);
     }
+    content = content.toString();
 
     var strippedContent = content.replace(/<[^>]+>/g, '');
 
@@ -686,7 +684,7 @@ function isLeaf(block) {
     var path = this.href().getOrDie();
     var info = JSON.parse(fs.readFileSync(path + '.info'));
     if (info.type != 'PNG' && info.type != 'JPEG')
-      throw path + ' has unsupported image format: ' + info.type;
+      sfig.throwException(path + ' has unsupported image format: ' + info.type);
     var dim = this.computeDesiredDim(info.width, info.height);
     var x = E(dim[0]);
     var y = E(dim[1]).negate();
@@ -757,7 +755,7 @@ function isLeaf(block) {
       if (justify == 'l') return -1;
       if (justify == 'c') return 0;
       if (justify == 'r') return +1;
-      throw 'Invalid justify (expected l,c,r): '+justify;
+      sfig.throwException('Invalid justify (expected l,c,r): '+justify);
     }
 
     // To compute the bounding box (if there are orphan children)
@@ -814,7 +812,7 @@ function isLeaf(block) {
     } else if (font == 'Noto Sans' || font == 'Arial') {
       family = '\\sfdefault';
     } else {
-      throw 'Unknown font: ' + font;
+      sfig.throwException('Unknown font: ' + font);
     }
 
     this.prefixes = { numeric: "n", pair: "r", path: "h", picture: "p", color: "c" };
@@ -929,7 +927,7 @@ function isLeaf(block) {
         self.verbatim('draw ' + pic + ';');
         var file = Path.resolve(block.href().get());
         if (!Path.existsSync(file))
-          throw 'File does not exist: ' + file;
+          sfig.throwException('File does not exist: ' + file);
         self.verbatim([
           'externalfigure',
           '"'+file+'"',
@@ -1028,19 +1026,20 @@ function isLeaf(block) {
       if (error) {
         console.log(task.name + ': ' + error.toString());
         console.log(stdout);
+        process.exit(1);  // Task failed - exit code 1
       } else {
         self.run();
       }
     });
   }
   Queue.prototype.apply = function(cmd) {
-    if (!sfig.isFunction(cmd)) throw 'Bad command (want function): ' + cmd;
+    if (!sfig.isFunction(cmd)) sfig.throwException('Bad command (want function): ' + cmd);
     var func = function(callback) { cmd(); callback(); }
     this.tasks.push({name: '[javascript]', func: func});
     this.run();
   }
   Queue.prototype.system = function(cmd) {
-    if (!sfig.isString(cmd)) throw 'Bad command (want string): ' + cmd;
+    if (!sfig.isString(cmd)) sfig.throwException('Bad command (want string): ' + cmd);
     var self = this;
     var func = function(callback) { self.exec(cmd, callback); };
     this.tasks.push({name: cmd, func: func});
@@ -1056,7 +1055,7 @@ function isLeaf(block) {
     var slideIndex = 0;
 
     var outPrefix = opts.outPrefix;
-    if (outPrefix == null) throw 'Missing outPrefix (will output to the directory outPrefix)';
+    if (outPrefix == null) sfig.throwException('Missing outPrefix (will output to the directory outPrefix)');
 
     // Combine if we're not writing to the current directory.
     var combine = opts.combine;
@@ -1097,4 +1096,6 @@ function isLeaf(block) {
         sfig_.queue.system(__dirname + '/../bin/pdfjoin ' + paths.join(' ') + ' --outfile ' + outPrefix + '.pdf');
     });
   };
+
+  sfig.readFile = function(path) { return fs.readFileSync(path).toString(); }
 })();
