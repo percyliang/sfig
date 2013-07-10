@@ -56,7 +56,7 @@
     if (!isFinite(miny)) throw 'miny is ' + miny;
     if (!isFinite(maxx)) throw 'maxx is ' + maxx;
     if (!isFinite(maxy)) throw 'maxy is ' + maxy;
-    this.minValue(minx, miny).maxValue(maxx, maxy);
+    this.minValue(minx, miny).maxValue(maxx, maxy);  // Can be overridden
   }
   sfig_.inheritsFrom('Graph', Graph, sfig.Block);
 
@@ -92,6 +92,7 @@
       var tickLabelScale = this.tickLabelScale()[axis].get();
       var roundPlaces = this.roundPlaces()[axis].get();
       var axisLabel = this.axisLabel()[axis].get();
+      var axisLabelRotate = this.axisLabelRotate()[axis].get();
       var axisLabelPadding = this.axisLabelPadding()[axis].get();
 
       var tickStartValue = this.tickStartValue()[axis].getOrElse(minValue);
@@ -122,7 +123,7 @@
         } else if (tickStyle == 'long') {
           // Ticks go all the way across the graph
           if (value != minValue)  // Exclude if we are already are drawing the axis
-            tick = sfig.line(convert(coord, 0), convert(coord, otherLength));
+            tick = sfig.line(convert(coord, 0), convert(coord, (axis == 1 ? 1 : -1) * otherLength));
         }
         if (tick != null) {
           tick.color(tickColor);
@@ -176,7 +177,7 @@
       // Axis label
       if (axisLabel != null) {
         axisLabel = sfig.std(axisLabel);
-        if (axis == 1) axisLabel.rotate(-90);
+        axisLabel.rotate(axisLabelRotate);
         this.axisLabelBlock = sfig.transform(axisLabel);
         if (axis == 0)
           this.axisLabelBlock.pivot(0, -1).shift(length / 2, axisLabelPadding);
@@ -215,10 +216,10 @@
   }
 
   Graph.prototype.xvalueToCoord = function(value) {
-    return +this.xlength().getOrDie() * (value - this.xminValue().get()) / (this.xmaxValue().get() - this.xminValue().get());
+    return +this.xlength().getOrDie() * (value - this.xminValue().getOrDie()) / (this.xmaxValue().getOrDie() - this.xminValue().getOrDie());
   }
   Graph.prototype.yvalueToCoord = function(value) {
-    return -sfig.downSign * this.ylength().getOrDie() * (value - this.yminValue().get()) / (this.ymaxValue().get() - this.yminValue().get());
+    return -sfig.downSign * this.ylength().getOrDie() * (value - this.yminValue().getOrDie()) / (this.ymaxValue().getOrDie() - this.yminValue().getOrDie());
   }
 
   // Trajectory
@@ -247,20 +248,22 @@
 
   // Tick labels
   sfig_.addPairProperty(Graph, 'expValue', 'xexpValue', 'yexpValue', null, null, 'Print out exponentiated values (useful for log-log plots)');
-  sfig_.addPairProperty(Graph, 'roundPlaces', 'xroundPlaces', 'yroundPlaces', 1, 1, 'Number of decimal places to print for tick labels');
+  sfig_.addPairProperty(Graph, 'roundPlaces', 'xroundPlaces', 'yroundPlaces', 0, 0, 'Number of decimal places to print for tick labels');
   sfig_.addPairProperty(Graph, 'tickLabels', 'xtickLabels', 'ytickLabels', null, null, 'Use these custom tick labels instead of tickLabelFormat');
   sfig_.addPairProperty(Graph, 'tickLabelFormat', 'xtickLabelFormat', 'ytickLabelFormat', 'reg', 'reg', 'How to render numbers (\'sci\' means 1e-6, \'pow\' means 10^6, \'human\' means 100K, \'reg\' is regular up to roundPlaces, null is none)');
   sfig_.addPairProperty(Graph, 'tickLabelPadding', 'xtickLabelPadding', 'ytickLabelPadding', 3, 3, 'Space between ticks and label');
-  sfig_.addPairProperty(Graph, 'tickLabelScale', 'xtickLabelScale', 'ytickLabelScale', 1, 1, 'How small are the ticks');
+  sfig_.addPairProperty(Graph, 'tickLabelScale', 'xtickLabelScale', 'ytickLabelScale', 0.7, 0.7, 'How small are the ticks');
 
   // Axis
   sfig_.addPairProperty(Graph, 'axisLabel', 'xaxisLabel', 'yaxisLabel', null, null, 'Labels of the axes');
   sfig_.addPairProperty(Graph, 'axisLabelPadding', 'xaxisLabelPadding', 'yaxisLabelPadding', 35, 35, 'How much space to put between the axis label and the tick labels');
+  sfig_.addPairProperty(Graph, 'axisLabelRotate', 'xaxisLabelRotate', 'yaxisLabelRotate', 0, -90, 'Number of degrees to rotate axis labels');
   sfig_.addPairProperty(Graph, 'legendPivot', 'xlegendPivot', 'ylegendPivot', null, null, 'Where to put the legend');
 
   // Marker
   sfig_.addProperty(Graph, 'marker', null, 'Function mapping trajectory to a marker object');
   sfig_.addProperty(Graph, 'markerSize', null, 'How big should the marker be?');
+  sfig_.addProperty(Graph, 'yvalueScale', null, 'Display y value above with this size');
 })();
 
 ////////////////////////////////////////////////////////////
@@ -323,10 +326,13 @@
 (function() {
   var BarGraph = sfig.BarGraph = function(trajectories) {
     BarGraph.prototype.constructor.call(this, trajectories);
+    this.xrange(0, trajectories[0].length + 1);
+    this.xtickIncrValue(1);
+    this.xtickIncludeAxis(false);
   }
   sfig_.inheritsFrom('BarGraph', BarGraph, sfig.Graph);
 
-  sfig_.addProperty(BarGraph, 'barWidth', 10, 'Bar width');
+  sfig_.addProperty(BarGraph, 'barWidth', 30, 'Bar width');
   sfig_.addProperty(BarGraph, 'innerBarSpacing', 2, 'Spacing between bars in a groups');
   sfig_.addProperty(BarGraph, 'outerBarSpacing', 2, 'Spacing between groups');
 
@@ -355,11 +361,22 @@
         // Corners
         var q0 = [x - barWidth/2, self.yvalueToCoord(self.yminValue().getOrDie())];
         var q1 = [x + barWidth/2, self.yvalueToCoord(p.y)];
+        //sfig.L(q0 + ' | ' + q1);
 
         // Create bar
-        var bar = polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
-        bar.tooltip(p.x + ',' + p.y);
-        self.addChild(bar);
+        if (q0[1] == q1[1]) {
+          sfig.L('Warning: empty bar will not be visible: ' + q0 + ' | ' + q1);
+        } else {
+          var bar = sfig.polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
+          bar.tooltip(p.x + ',' + p.y);
+          self.addChild(bar);
+          var yvalueScale = self.yvalueScale().get();
+          if (yvalueScale != null) {
+            var str = text(p.y).scale(yvalueScale);
+            var yvalue = sfig.transform(str).pivot(0, 1).shift(bar.xmiddle(), bar.top().up(5));
+            self.addChild(yvalue);
+          }
+        }
         group++;
       });
     }
