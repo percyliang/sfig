@@ -116,7 +116,10 @@ function isLeaf(block) {
     return new MetapostExpr(this.type, '-', [this]);
   }
   MetapostExpr.prototype.square = function() { return this.mul(this); }
-  MetapostExpr.prototype.sqrt = function() { return new MetapostExpr('numeric', 'sqrt', [this]); }
+  MetapostExpr.prototype.sqrt = function() {
+    if (this.isPrimitiveNumber()) return MetapostExpr.numeric(Math.sqrt(this.func));
+    return new MetapostExpr('numeric', 'sqrt', [this]);
+  }
   MetapostExpr.prototype.add = function(p) {
     p = MetapostExpr.ensureNumeric(p);
     if (this.isZero()) return p;
@@ -223,13 +226,13 @@ function isLeaf(block) {
 
   MetapostExpr.prototype.x = function() {
     this.assertPair();
-    if (this.children) return Value.numeric(this.children[0]);
-    else return new MetapostExpr('numeric', 'xpart', [this]);
+    if (this.func == 'pair') return this.args[0];
+    return new MetapostExpr('numeric', 'xpart', [this]);
   }
   MetapostExpr.prototype.y = function() {
     this.assertPair();
-    if (this.children) return Value.numeric(this.children[1]);
-    else return new MetapostExpr('numeric', 'ypart', [this]);
+    if (this.func == 'pair') return this.args[1];
+    return new MetapostExpr('numeric', 'ypart', [this]);
   }
 
   MetapostExpr.text = function(str, useRawBounds, fontSize) {
