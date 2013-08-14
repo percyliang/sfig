@@ -1491,7 +1491,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Need backslashes for LaTeX; strip them here.
     // TODO: do the replacement inside the HtmlDivElement as well
     if (sfig.isString(content)) {
-      content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
+      var inMathMode = content[0] == '$';  // HACK
+      if (!inMathMode)  // Don't do this in math mode
+        content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
     }
 
     div.appendChild(sfig_.ensureHTMLElement(content));
