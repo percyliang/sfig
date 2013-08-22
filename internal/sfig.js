@@ -887,6 +887,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addPairProperty(Block, 'level', 'showLevel', 'hideLevel', null, null, 'Levels at which this object is available.');
   Block.prototype.numLevels = function(n) { return this.hideLevel(this.showLevel().add(n)); } // How long to display this object
 
+  sfig_.addProperty(Block, 'offline', null, 'Is this Block offline, which means that it shouldn\'t be shown in the presentation?');
   sfig_.addProperty(Block, 'orphan', null, 'Orphans do not contribute to the bounding box of its parent.');
   sfig_.addPairProperty(Block, 'parentPivot', 'xparentPivot', 'yparentPivot', null, null, 'Pivot used by parent.');
 
@@ -902,9 +903,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addProperty(Block, 'onShow', null, 'Function to call when object is shown.');
   sfig_.addProperty(Block, 'onUpdateUrlParams', null, 'For top-level objects (slides), call when URL parameters are updated');
 
+  // DEPRECATED
   sfig_.addMapProperty(Block, 'partOnClick', null, 'Function to call when part of the object is clicked.');
   sfig_.addMapProperty(Block, 'partTooltip', null, 'String to display when mouse goes over.');
-
   sfig_.addProperty(Block, 'appendix', null, 'Block which will be added in a big Overlay at the top-level.');
 
   // Rendered properties.
@@ -1454,6 +1455,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var ul = sfig_.newElem('ul');
       ul.style.margin = 0;
       for (var i = 1; i < content.length; i++) {
+        if (content[i] == _) continue;
         var li = sfig_.newElem('li');
         //li.style.listStyleType = 'square';
         //li.style.listStyleImage = 'url("'+sfig.getInternalDir()+'/../images/blue-sphere.png")';
@@ -2649,7 +2651,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   sfig_.addProperty(Slide, 'notes', null, 'Identifier of the slide');
   sfig_.addProperty(Slide, 'showHelp', false, 'Whether to show help');
-  sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices');
+  sfig_.addProperty(Slide, 'showIndex', true, 'Whether to show slide indices (page numbers)');
   sfig_.addProperty(Slide, 'extra', null, 'Object to overlay on top of the slide');
 
   // Usage: slide(title, ...); if title is null, then don't allocate any space for it.
@@ -2747,10 +2749,24 @@ sfig.down = function(x) { return x * sfig.downSign; };
     };
   }
 
+  // Return the number of slides that we have to move in direction |dir|
+  // before we hit a non-offline slide.
+  Presentation.prototype.distanceToNeighboringSlide = function(dir) {
+    var total = dir;
+    while (true) {
+      var slide = this.slides[this.currSlideIndex+total];
+      if (!slide) return 0;
+      if (sfig_.urlParams.includeOffline || !slide.offline().get()) break;
+      total += dir;
+    }
+    return total;
+  }
+
   Presentation.prototype.showNextSlide = function(firstLevel, callback) {
     var self = this;
-    if (self.currSlideIndex+1 < self.slides.length) {
-      self.setSlideIndex(self.currSlideIndex+1, function() {
+    var n = self.distanceToNeighboringSlide(+1);
+    if (n != 0) {
+      self.setSlideIndex(self.currSlideIndex+n, function() {
         self.setLevel(firstLevel ? 0 : self.currMaxLevel());
         self.updateUrlParams();
         callback();
@@ -2762,8 +2778,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Presentation.prototype.showPrevSlide = function(firstLevel, callback) {
     var self = this;
-    if (self.currSlideIndex-1 >= 0) {
-      self.setSlideIndex(self.currSlideIndex-1, function() {
+    var n = self.distanceToNeighboringSlide(-1);
+    if (n != 0) {
+      self.setSlideIndex(self.currSlideIndex+n, function() {
         self.setLevel(firstLevel ? 0 : self.currMaxLevel());
         self.updateUrlParams();
         callback();
@@ -3000,7 +3017,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (slide == null) sfig.throwException('Invalid slide index: '+self.currSlideIndex);
     self.container.appendChild(self.slides[self.currSlideIndex].state.svg);
 
-    if (sfig_.urlParams.mode == 'fullScreen') slide.borderWidth(0);
+    if (sfig_.urlParams.mode == 'fullScreen') {
+      if (slide.borderWidth) slide.borderWidth(0);
+    }
 
     var state = slide.state;
 
@@ -3481,5 +3500,28 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var prez = sfig.presentation({initKeys: false});
     prez.addSlide(block);
     prez.displayPrinterFriendly(container);
+  }
+
+  // Call this function to include another file
+  sfig.includeFileFromArgs = function() {
+    if (sfig.serverSide) {
+      var path = process.argv[2];
+      if (!path) {
+        console.log('Missing Javascript file to include');
+        process.exit(1);
+      } else {
+        require(path);
+        return true;
+      }
+    } else {
+      var path = sfig_.urlParams.include;
+      if (!path) {
+        console.log('Missing Javascript file to include (using #include=...)');
+        return false;
+      } else {
+        sfig_.includeScript('./' + sfig_.urlParams.include);
+        return true;
+      }
+    }
   }
 })();
