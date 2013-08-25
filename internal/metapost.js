@@ -115,11 +115,23 @@ function isLeaf(block) {
     if (this.type == 'numeric' && sfig.isNumber(this.func)) return MetapostExpr.numeric(-this.func);
     return new MetapostExpr(this.type, '-', [this]);
   }
+
+  // Danger: can overflow
   MetapostExpr.prototype.square = function() { return this.mul(this); }
   MetapostExpr.prototype.sqrt = function() {
     if (this.isPrimitiveNumber()) return MetapostExpr.numeric(Math.sqrt(this.func));
     return new MetapostExpr('numeric', 'sqrt', [this]);
   }
+
+  // Return distance between points this and p
+  MetapostExpr.prototype.distance = function(p) {
+    var xdiff = this.x().sub(p.x());
+    var ydiff = this.y().sub(p.y());
+    if (xdiff.isZero()) return ydiff;
+    if (ydiff.isZero()) return xdiff;
+    return new MetapostExpr('numeric', '++', [xdiff, ydiff]);
+  }
+
   MetapostExpr.prototype.add = function(p) {
     p = MetapostExpr.ensureNumeric(p);
     if (this.isZero()) return p;
@@ -251,13 +263,12 @@ function isLeaf(block) {
     if (this.func == 'mediation') return this.args[0] + '[' + this.args[1] + ',' + this.args[2] + ']';
     if (this.func == 'pair' || this.func == 'color') return '(' + this.args.join(',') + ')';
     if (this.func == 'path') return '(' + this.args.join('') + ')';
-    //if (this.func in drawFuncs) return '(' + this.func + ' ' + this.args.join(' ') + ')';
     if (this.func in drawFuncs) return this.func + ' ' + this.args.join(' ');
-    if (this.func == '-' && this.args.length == 1)
+    if (this.func == '-' && this.args.length == 1)  // Unary negation
       return '(-' + this.args[0] + ')';
     if (this.func in infixFuncs)
       return '(' + this.args[0] + ' ' + this.func + ' ' + this.args[1] + ')';
-    if (this.func == '+' || this.func == '-' || this.func == '*' || this.func == '/')  // Infix
+    if (this.func == '+' || this.func == '-' || this.func == '*' || this.func == '/' || this.func == '++')  // Infix
       return '(' + this.args[0] + this.func + this.args[1] + ')';
     return this.func + '(' + this.args.join(',') + ')'; // Standard form for function
   };
@@ -358,24 +369,97 @@ function isLeaf(block) {
   }
 
   // Based off Text.bulletize()
-  bulletizeLatex = function(content) {
+  var bulletizeLatex = function(content) {
     if (content instanceof Array) {
       var result = [];
       if (content[0]) result.push(content[0]);
-      var result = [];
-      result.push('\\begin{itemize}');
-      result.push('\\setlength{\\itemsep}{0pt}');
-      for (var i = 1; i < content.length; i++) {
-        result.push('\\item ' + bulletizeLatex(content[i]));
+      if (content.length > 1) {
+        result.push('\\begin{itemize}');
+        result.push('\\setlength{\\itemsep}{0pt}');
+        for (var i = 1; i < content.length; i++) {
+          if (content[i] == _) continue;
+          result.push('\\item ' + bulletizeLatex(content[i]));
+        }
+        result.push('\\end{itemize}');
       }
-      result.push('\\end{itemize}');
       return result.join("\n");
+    }
+    return content;
+  }
+
+  // Apply to segments which are not in math mode
+  // Example: "the equation $x^2$ and $y^2$", we would call:
+  //   func("the equation "), func(" and ")
+  var mapNonMathMode = function(str, func) {
+    var newStr = '';
+    var inMathMode = false;
+    var start = 0;
+    for (var i = 0; i <= str.length; i++) {
+      var c = str[i];
+      if (i == str.length || (c == '$' && str[i-1] != '\\')) {
+        if (inMathMode) {  // Include '$'
+          newStr += str.substring(start, i+1);
+          start = i+1;
+        } else {  // Exclude $
+          newStr += func(str.substring(start, i));
+          start = i; 
+        }
+        inMathMode = !inMathMode;
+      }
+    }
+    return newStr;
+  }
+
+  var makeLatexFriendly = function(content) {
+    if (!content) return content;
+    if (content instanceof Array) return content.map(makeLatexFriendly);
+
+    // Convert HTML to LaTeX
+    content = content.replace(/&ndash;/g, '--');
+    content = content.replace(/&mdash;/g, '---');
+    content = content.replace(/&amp;/g, '\\&');
+    content = content.replace(/&aacute;/g, '\\\'a');
+    content = content.replace(/&eacute;/g, '\\\'e');
+    content = content.replace(/&iacute;/g, '\\\'i');
+    content = content.replace(/&oacute;/g, '\\\'o');
+    content = content.replace(/&uacute;/g, '\\\'u');
+    content = content.replace(/&auml;/g, '\\"a');
+    content = content.replace(/&euml;/g, '\\"e');
+    content = content.replace(/&iuml;/g, '\\"i');
+    content = content.replace(/&ouml;/g, '\\"o');
+    content = content.replace(/&uuml;/g, '\\"u');
+
+    content = content.replace(/%/g, '\\%');
+    content = content.replace(/#/g, '\\#');
+
+    // Quote these things outside math mode
+    content = mapNonMathMode(content, function(s) {
+      s = s.replace(/&/g, '\\&');
+      s = s.replace(/_/g, '\\_');
+      s = s.replace(/{/g, '\\{');
+      s = s.replace(/}/g, '\\}');
+      return s;
+    });
+
+    // Replace HTML tags with LaTeX markup
+    // This is kind of inefficient.
+    // Metapost: doesn't seem to support both italics and bold, whereas normal Latex does.
+    while (true) {
+      var oldContent = content;
+      content = content.replace(/<b>([^<]+)<\/b>/g, '\\textbf{$1}');
+      content = content.replace(/<i>([^<]*)<\/i>/g, '\\textit{$1}');
+      content = content.replace(/<tt>([^<]*)<\/tt>/g, '\\texttt{$1}');
+      content = content.replace(/<font color="([^>]+)">([^<]*)<\/font>/g, '\\textcolor{$1}{$2}');
+      if (oldContent == content) break;
     }
     return content;
   }
 
   sfig.Text.prototype.drawMetapost = function(writer) {
     var content = this.content().get();
+    var strippedContent = content.toString().replace(/<[^>]+>/g, '');  // Used to heuristically determine length of string
+
+    content = makeLatexFriendly(content);
 
     // Put bullets.
     if (this.bulleted().get()) {
@@ -388,47 +472,23 @@ function isLeaf(block) {
     }
     content = content.toString();
 
-    var strippedContent = content.replace(/<[^>]+>/g, '');
-
-    // Replace HTML tags with LaTeX markup
-    // This is inefficient.
-    // Metapost: doesn't seem to support both italics and bold, whereas normal Latex does.
-    while (true) {
-      var oldContent = content;
-      content = content.replace(/<b>([^<]+)<\/b>/g, '\\textbf{$1}');
-      content = content.replace(/<i>([^<]*)<\/i>/g, '\\textit{$1}');
-      content = content.replace(/<tt>([^<]*)<\/tt>/g, '\\texttt{$1}');
-      content = content.replace(/<font color="([^>]+)">([^<]*)<\/font>/g, '\\textcolor{$1}{$2}');
-      if (oldContent == content) break;
-    }
-
-    // Convert HTML to LaTeX (somewhat dangerous)
-    content = content.replace(/%/g, '\\%');
-    content = content.replace(/&ndash;/g, '--');
-    content = content.replace(/&mdash;/g, '---');
-    content = content.replace(/&amp;/g, '\\&');
-    // Quote these things outside math mode
-    //content = content.replace(/_/g, '\\_');
-    content = content.replace(/&/g, '\\&');
-    content = content.replace(/#/g, '\\#');
-    //content = content.replace(/{/g, '\\{');
-    //content = content.replace(/}/g, '\\}');
-    //sfig.L(content);
-
     // In Metapost, wrapping means we have to put things in a minipage, which
     // means (unlike SVG) it takes up the entire allotted width.
     var autowrap = this.bulleted().get() || this.autowrap().get();
     if (autowrap == null) {
       // Try to guess what is the appropriate behavior here.
       // For short strings, don't autowrap.  For long ones, do.
-      autowrap = strippedContent.length > 64;
+      autowrap = strippedContent.length > 64 && !this.xparentPivot().exists();
     }
     //L(strippedContent + ': ' + autowrap);
     if (autowrap) {
       var width = this.width().getOrDie() / 210;  // Hack: need to find right ratio
+      width /= this.fontSize().get() / 28;
       //L(content + ': ' + this.width().get());
       content = '\\begin{minipage}{'+width+'in}\n' + content + '\n\\end{minipage}';
     }
+
+    //sfig.L('TRANSFORMED CONTENT: ' + content);
 
     var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie()));
     this.pic = writer.store(pic.ydown(pic.realHeight()));
@@ -520,14 +580,15 @@ function isLeaf(block) {
       else  // No arrow
         this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
 
+      // TODO: this code causes overflow
       // If arrows are thick, the bounding box doesn't contain the entire arrow,
       // so we have to manually increase the bounding box.
       if (d1 || d2) {
         var p1 = origPath.args[0], sep = origPath.args[1], p2 = origPath.args[2];
         var newp1 = p1, newp2 = p2;
-        var xsq = p1.x().sub(p2.x()).square();
-        var ysq = p1.y().sub(p2.y()).square();
-        var dist = xsq.add(ysq).sqrt();
+        //var xsq = p1.x().sub(p2.x()).square();
+        //var ysq = p1.y().sub(p2.y()).square();
+        var dist = p1.distance(p2);
         dist = writer.storeIfComplex(dist);
         // How much an arrow is going to spill over
         var extraLength = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
@@ -999,8 +1060,17 @@ function isLeaf(block) {
 
     // Check to see if the Metapost file changed.
     if (oldContents.toString() != newContents.toString() || !Path.existsSync(outPath.replace(/\.mp$/, '.pdf'))) {
+      var textContents = []
+      function getTextBlocks(block) {
+        if (block instanceof sfig.Text)
+          textContents.push(block.content().get());
+        block.children.forEach(getTextBlocks);
+      }
+      getTextBlocks(slide);
+      var slideSummary = '--- ERROR SLIDE: ' + outPath + ' ---\n' + textContents.join("\n");
+
       // Convert Metapost to PDF
-      sfig_.queue.system(__dirname + '/../bin/mpto1pdf -quiet \'' + outPath + '\'');
+      sfig_.queue.system(__dirname + '/../bin/mpto1pdf -quiet \'' + outPath + '\'', {failMessage: slideSummary});
     }
   }
 
@@ -1029,6 +1099,7 @@ function isLeaf(block) {
       if (error) {
         console.log(task.name + ': ' + error.toString());
         console.log(stdout);
+        if (task.opts.failMessage) console.log(task.opts.failMessage);
         process.exit(1);  // Task failed - exit code 1
       } else {
         self.run();
@@ -1038,14 +1109,14 @@ function isLeaf(block) {
   Queue.prototype.apply = function(cmd) {
     if (!sfig.isFunction(cmd)) sfig.throwException('Bad command (want function): ' + cmd);
     var func = function(callback) { cmd(); callback(); }
-    this.tasks.push({name: '[javascript]', func: func});
+    this.tasks.push({name: '[javascript]', func: func, opts: {}});
     this.run();
   }
-  Queue.prototype.system = function(cmd) {
+  Queue.prototype.system = function(cmd, opts) {
     if (!sfig.isString(cmd)) sfig.throwException('Bad command (want string): ' + cmd);
     var self = this;
     var func = function(callback) { self.exec(cmd, callback); };
-    this.tasks.push({name: cmd, func: func});
+    this.tasks.push({name: cmd, func: func, opts: opts});
     this.run();
   }
   sfig_.queue = new Queue();
@@ -1088,7 +1159,7 @@ function isLeaf(block) {
         var id = slide.id().getOrElse(slideIndex);
         var slidePrefix = outPrefix + '/' + id;
         if (!opts.lazy || !Path.existsSync(slidePrefix + '.pdf')) {
-          sfig.L('Slide ' + slideIndex + '/' + self.slides.length + ': ' + id);
+          sfig.L('Slide ' + slideIndex + '/' + self.slides.length + ': ' + id + (slide.title ? ' [' + slide.title().get() + ']' : ''));
           createMetapost(slide, slidePrefix + '.mp');
         }
         paths.push(slidePrefix + '.pdf');

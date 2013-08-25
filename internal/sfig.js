@@ -1452,17 +1452,19 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (content instanceof Array) {
       var result = sfig_.newElem('div');
       if (content[0]) result.appendChild(sfig_.ensureHTMLElement(content[0]));
-      var ul = sfig_.newElem('ul');
-      ul.style.margin = 0;
-      for (var i = 1; i < content.length; i++) {
-        if (content[i] == _) continue;
-        var li = sfig_.newElem('li');
-        //li.style.listStyleType = 'square';
-        //li.style.listStyleImage = 'url("'+sfig.getInternalDir()+'/../images/blue-sphere.png")';
-        li.appendChild(Text.bulletize(content[i]));
-        ul.appendChild(li);
+      if (content.length > 1) {
+        var ul = sfig_.newElem('ul');
+        ul.style.margin = 0;
+        for (var i = 1; i < content.length; i++) {
+          if (content[i] == _) continue;
+          var li = sfig_.newElem('li');
+          //li.style.listStyleType = 'square';
+          //li.style.listStyleImage = 'url("'+sfig.getInternalDir()+'/../images/blue-sphere.png")';
+          li.appendChild(Text.bulletize(content[i]));
+          ul.appendChild(li);
+        }
+        result.appendChild(ul);
       }
-      result.appendChild(ul);
       return result;
     }
     return sfig_.ensureHTMLElement(content);
@@ -1488,14 +1490,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (this.bulleted().get()) {
       if (sfig.isString(content)) content = [null, content];
       content = Text.bulletize(content);
-    }
-
-    // Need backslashes for LaTeX; strip them here.
-    // TODO: do the replacement inside the HtmlDivElement as well
-    if (sfig.isString(content)) {
-      var inMathMode = content[0] == '$';  // HACK
-      if (!inMathMode)  // Don't do this in math mode
-        content = content.replace(/\\{/g, '{').replace(/\\}/g, '}');
     }
 
     div.appendChild(sfig_.ensureHTMLElement(content));
