@@ -614,8 +614,8 @@ function isLeaf(block) {
       y2 = block.y2().getOrDie();
     }
 
-    var p1 = [x1, y1];
-    var p2 = [x2, y2];
+    var p1 = MetapostExpr.pair([x1, y1]);
+    var p2 = MetapostExpr.pair([x2, y2]);
     var sep = block.curved ? '..' : '--';
     var path = sfig.MetapostExpr.path([p1, sep, p2]);
 
