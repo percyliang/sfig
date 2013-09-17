@@ -1,5 +1,7 @@
 // Shows an example of a really simple presentation.
-// Feel free to copy this to use as a template.
+
+require('../internal/sfig.js');
+require('../internal/metapost.js');
 
 // Don't need math for this simple example
 sfig.enableMath = false;
@@ -35,3 +37,5 @@ prez.addSlide(slide('Conclusion',
   bulletedText('Tutorial').linkToExternal('tutorial'),
   bulletedText('GitHub').linkToUrl('http://github.com/percyliang/sfig'),
 _));
+
+prez.writePdf({outPrefix: 'simple-presentation'});

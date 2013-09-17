@@ -1532,7 +1532,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   sfig_.addProperty(Text, 'content', null, 'The string to be displayed.');
-  sfig_.addProperty(Text, 'font', 'Noto Sans', 'Font to use to display the text.');
+  sfig_.addProperty(Text, 'font', 'Arial', 'Font to use to display the text.');
   sfig_.addProperty(Text, 'fontSize', 28, 'Font size to use to display the text.');
   sfig_.addProperty(Text, 'width', null, 'Affects wrapping (default: Slide width)');
   sfig_.addProperty(Text, 'bulleted', null, 'Whether to prepend a bullet');
