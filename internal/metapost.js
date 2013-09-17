@@ -549,7 +549,6 @@ function isLeaf(block) {
   }
 
   sfig.Block.prototype.drawPath = function(writer, path) {
-    var origPath = path;
     this.path = path = writer.storeIfComplex(path);
     var strokeColor = this.strokeColor().get();
     var fillColor = this.fillColor().get();
@@ -580,30 +579,6 @@ function isLeaf(block) {
       else  // No arrow
         this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
 
-      // TODO: this code causes overflow
-      // If arrows are thick, the bounding box doesn't contain the entire arrow,
-      // so we have to manually increase the bounding box.
-      if (d1 || d2) {
-        var p1 = origPath.args[0], sep = origPath.args[1], p2 = origPath.args[2];
-        var newp1 = p1, newp2 = p2;
-        //var xsq = p1.x().sub(p2.x()).square();
-        //var ysq = p1.y().sub(p2.y()).square();
-        var dist = p1.distance(p2);
-        dist = writer.storeIfComplex(dist);
-        // How much an arrow is going to spill over
-        var extraLength = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
-
-        if (d1) {
-          var d1frac = MetapostExpr.zero.sub(extraLength).div(dist);
-          newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
-        }
-        if (d2) {
-          var d2frac = dist.add(extraLength).div(dist);
-          newp2 = sfig.MetapostExpr.mediation(d2frac, p1, p2);
-        }
-        var expandedPath = sfig.MetapostExpr.path([newp1, sep, newp2]);
-        writer.setBounds(this.pic, expandedPath.bbox());
-      }
       return;
     }
     
@@ -620,7 +595,7 @@ function isLeaf(block) {
     }
   }
 
-  function createLinePath(writer, block) {
+  function createLinePath(writer, block, decoratedBlock) {
     // Get positions
     var x1, y1, x2, y2;
     if (block.b1().get() != null) {
@@ -639,8 +614,8 @@ function isLeaf(block) {
       y2 = block.y2().getOrDie();
     }
 
-    var p1 = [x1, y1];
-    var p2 = [x2, y2];
+    var p1 = MetapostExpr.pair([x1, y1]);
+    var p2 = MetapostExpr.pair([x2, y2]);
     var sep = block.curved ? '..' : '--';
     var path = sfig.MetapostExpr.path([p1, sep, p2]);
 
@@ -672,18 +647,41 @@ function isLeaf(block) {
       path = writer.storeIfComplex(path);
       p2 = sfig.MetapostExpr.intersectionpoint(path, getBoundingPath(block.b2().get()));
     }
-    // TODO: if using a thick arrow, need to apply mediation to make sure tip lands exactly at p1 or p2.
-    path = sfig.MetapostExpr.path([p1, sep, p2]);
+
+    // If using a thick arrow, need to apply mediation to make sure tip lands exactly at p1 or p2.
+    if (decoratedBlock instanceof sfig.DecoratedLine) {
+      var d1 = decoratedBlock.drawArrow1().get();
+      var d2 = decoratedBlock.drawArrow2().get();
+      if (d1 || d2) {
+        var newp1 = p1, newp2 = p2;
+        var dist = p1.distance(p2);
+        dist = writer.storeIfComplex(dist);
+        // How much an arrow is going to spill over
+        var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
+
+        if (d1) {
+          var d1frac = extraLength.div(dist);
+          newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
+        }
+        if (d2) {
+          var d2frac = dist.sub(extraLength).div(dist);
+          newp2 = sfig.MetapostExpr.mediation(d2frac, p1, p2);
+        }
+        path = sfig.MetapostExpr.path([newp1, sep, newp2]);
+      }
+    } else {
+      path = sfig.MetapostExpr.path([p1, sep, p2]);
+    }
     return path;
   }
 
   sfig.Line.prototype.drawMetapost = function(writer) {
-    var path = createLinePath(writer, this);
+    var path = createLinePath(writer, this, null);
     this.drawPath(writer, path);
   }
 
   sfig.DecoratedLine.prototype.drawMetapost = function(writer) {
-    var path = createLinePath(writer, this.line);
+    var path = createLinePath(writer, this.line, this);
     this.drawPath(writer, path);
   }
 

@@ -41,16 +41,20 @@ G.prez = sfig.presentation();
 
 // Useful functions (not standard enough to put into an sfig library).
 
-G.frameBox = function(a) { return frame(a).padding(5).bg.strokeWidth(1).fillColor('white').end; }
+G.frameBox = function(a) { return frame(a).bg.strokeWidth(1).fillColor('white').end; }
+G.bigFrameBox = function(a) { return frameBox(a).padding(10).scale(1.4); }
 
-G.bigLeftArrow = function() { return leftArrow(100).strokeWidth(10).color('brown'); }
-G.bigRightArrow = function() { return rightArrow(100).strokeWidth(10).color('brown'); }
-G.bigUpArrow = function() { return upArrow(100).strokeWidth(10).color('brown'); }
-G.bigDownArrow = function() { return downArrow(100).strokeWidth(10).color('brown'); }
+G.bigLeftArrow = function(s) { return leftArrow(s || 100).strokeWidth(10).color('brown'); }
+G.bigRightArrow = function(s) { return rightArrow(s || 100).strokeWidth(10).color('brown'); }
+G.bigUpArrow = function(s) { return upArrow(s || 100).strokeWidth(10).color('brown'); }
+G.bigDownArrow = function(s) { return downArrow(s || 100).strokeWidth(10).color('brown'); }
+
 G.red = function(x) { return x.fontcolor('red'); }
 G.green = function(x) { return x.fontcolor('green'); }
 G.blue = function(x) { return x.fontcolor('blue'); }
 G.darkblue = function(x) { return x.fontcolor('darkblue'); }
+G.brown = function(x) { return x.fontcolor('brown'); }
+G.purple = function(x) { return x.fontcolor('purple'); }
 
 G.xseq = function() { return new sfig.Table([arguments]).center().margin(5); }
 G.yseq = function() { return ytable.apply(null, arguments).margin(10); }
@@ -68,7 +72,7 @@ G.headerList = function(title) {
 
 G.node = function(x, shaded) { return overlay(circle(20).fillColor(shaded ? 'lightgray' : 'white') , x).center(); }
 G.indent = function(x, n) { return frame(x).xpadding(n != null ? n : 20).xpivot(1); }
-G.stagger = function(b1, b2) { b1 = std(b1); b2 = std(b2); return overlay(b1, pause(), b2.replace(b1)); }
+G.stagger = function(b1, b2) { b1 = std(b1); b2 = std(b2); return overlay(b1.numLevels(1), pause(), b2); }
 
 G.dividerSlide = function(text) {
   return slide(null, nil(), parentCenter(text)).titleHeight(0);
