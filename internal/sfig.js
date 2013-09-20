@@ -84,6 +84,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.resetCursor = function() {
     document.documentElement.style.cursor = sfig.defaultCursor;
   }
+  sfig.isCursorHidden = function() {
+    return document.documentElement.style.cursor == 'none';
+  }
   sfig.hideCursor = function() {
     document.documentElement.style.cursor = 'none';
   }
@@ -379,7 +382,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var items = href.split(/[#&]/);
     for (var i = 1; i < items.length; i++) {
       var pair = items[i].split(/=/);
-      params[pair[0]] = unescape(pair[1]);
+      params[pair[0]] = decodeURIComponent(pair[1]);
     }
     return params;
   }
@@ -391,7 +394,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var first = true;
     for (var name in params) {
       if (params[name] == null) continue;
-      str += (first ? '#' : '&') + name + '=' + escape(params[name]);
+      str += (first ? '#' : '&') + name + '=' + encodeURIComponent(params[name]);
       first = false;
     }
     return str;
@@ -1013,6 +1016,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
   }
 
+  // Call this function when change properties of this Block and want to propagate to elem.
+  Block.prototype.updateElem = function() {
+    this.setStrokeFillProperties(this.elem, true);
+    return this;
+  }
+
   // Hacky: look inside the element to get the strokeWidth property
   function getStrokeWidth(elem) {
     if (elem.style.strokeWidth != '')
@@ -1387,6 +1396,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Helper function
   Block.prototype.setPointerWhenMouseOver = function() {
+    // TODO: do this by changing cursor property
     // TODO: highlight the link (e.g., change color)
     this.onMouseover(function() { sfig.setPointerCursor(); });
     this.onMouseout(function() { sfig.resetCursor(); });
@@ -1475,6 +1485,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Text.fontsLoaded = false;
 
+  Text.prototype.updateElem = function() {
+    // Just replace the text - assume that it doesn't change the width.
+    var div = this.elem.childNodes[0];
+    div.innerHTML = this.content().getOrDie();
+    Block.prototype.updateElem.call(this);
+  }
+
   Text.prototype.renderElem = function(state, callback) {
     var self = this;
 
@@ -1502,7 +1519,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
     elem.setAttribute('width', this.autowrap().getOrElse(true) ? this.width().get() : 1000000);
     elem.setAttribute('height', 1000000);
     elem.appendChild(div);
-    state.svg.appendChild(elem);  // Add temporarily to the root SVG to just get the size of this text
+
+    if (state)
+      state.svg.appendChild(elem);  // Add temporarily to the root SVG to just get the size of this text
 
     function fontsLoaded() {
       Text.fontsLoaded = true;
@@ -2913,8 +2932,15 @@ sfig.down = function(x) { return x * sfig.downSign; };
         self.processKey(key, processKeyQueue);
       }
     }
+
+    // When press down key, want to hide cursor.
+    // But sometimes this triggers a mouse move,
+    // so we need to ignore 
+    var justHid;
+
     document.documentElement.addEventListener('keydown', function(event) {
       sfig.hideCursor();
+      justHid = true;
       if (!sfig_.keysEnabled) return;
       var key = sfig_.eventToKey(event);
       self.keyQueue.push(key);
@@ -2922,7 +2948,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }, false);
 
     document.documentElement.addEventListener('mousemove', function(event) {
-      sfig.resetCursor();
+      if (!justHid) {
+        if (sfig.isCursorHidden()) sfig.resetCursor();
+      } else {
+        justHid = false;
+      }
     }, false);
 
     // Allow scrolling to go to previous and next slide builds
@@ -2945,6 +2975,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
       document.onmousewheel = handleMouseWheel;
       document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
     }
+
+    /*document.documentElement.addEventListener('dblclick', function(event) {
+      self.keyQueue.push('down');
+      processKeyQueue(function() {});
+      sfig.L('click');
+    }, false);*/
   }
 
   Presentation.prototype.getHelpBlock = function() {
