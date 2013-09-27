@@ -377,7 +377,6 @@ function isLeaf(block) {
         result.push('\\begin{itemize}');
         result.push('\\setlength{\\itemsep}{0pt}');
         for (var i = 1; i < content.length; i++) {
-          if (content[i] == _) continue;
           result.push('\\item ' + bulletizeLatex(content[i]));
         }
         result.push('\\end{itemize}');
@@ -412,7 +411,13 @@ function isLeaf(block) {
 
   var makeLatexFriendly = function(content) {
     if (!content) return content;
+    if (content == _) return content;
     if (content instanceof Array) return content.map(makeLatexFriendly);
+
+    if (typeof(content) != 'string') {
+      sfig.L(content);
+      throw content + ' is not a string, but is ' + typeof(content);
+    }
 
     // Convert HTML to LaTeX
     content = content.replace(/&ndash;/g, '--');
@@ -428,6 +433,7 @@ function isLeaf(block) {
     content = content.replace(/&iuml;/g, '\\"i');
     content = content.replace(/&ouml;/g, '\\"o');
     content = content.replace(/&uuml;/g, '\\"u');
+    content = content.replace(/&nbsp;/g, '\\ ');
 
     content = content.replace(/%/g, '\\%');
     content = content.replace(/#/g, '\\#');
@@ -449,6 +455,8 @@ function isLeaf(block) {
       content = content.replace(/<b>([^<]+)<\/b>/g, '\\textbf{$1}');
       content = content.replace(/<i>([^<]*)<\/i>/g, '\\textit{$1}');
       content = content.replace(/<tt>([^<]*)<\/tt>/g, '\\texttt{$1}');
+      content = content.replace(/<del>([^<]*)<\/del>/g, '\\sout{$1}');
+      content = content.replace(/<ins>([^<]*)<\/ins>/g, '\\uline{$1}');
       content = content.replace(/<font color="([^>]+)">([^<]*)<\/font>/g, '\\textcolor{$1}{$2}');
       if (oldContent == content) break;
     }
@@ -468,6 +476,7 @@ function isLeaf(block) {
       // Note: in SVG, width() is an upper bound on how much space we'll take.
       // Here, we will actually use up all of width because of minipage.
       // We must use minipage for itemize, but also allows us to do wrapping.
+      content = sfig_.removeIgnoreObject(content);
       content = bulletizeLatex(content);
     }
     content = content.toString();

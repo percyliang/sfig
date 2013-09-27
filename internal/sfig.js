@@ -70,15 +70,33 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // around).
   sfig._ = {'IGNORED' : true};
 
+  // Recursively remove the IGNORE object from x.
+  // [_, 3, [5, _]] => [3, [5]]
+  sfig_.removeIgnoreObject = function(x) {
+    if (x instanceof Array) {
+      var newx = [];
+      for (var i = 0; i < x.length; i++) {
+        if (x[i] == _) continue;
+        newx.push(sfig_.removeIgnoreObject(x[i]));
+      }
+      return newx;
+    }
+    return x;
+  }
+
   // Usage: let(x = 4, y = 5)
   // Allows definitions in the middle of function calls.
   sfig.let = function() { return _; }
 
   // Concatenate strings
-  sfig.cat = function() { return Array.prototype.slice.call(arguments).join(''); }
+  sfig.cat = function() { return sfig_.removeIgnoreObject(Array.prototype.slice.call(arguments)).join(''); }
 
-  sfig.defaultCursor = '';
-  sfig.setPointerCursor = function() {
+  var arrowCursor = '';
+  sfig.defaultCursor = arrowCursor;
+  sfig.setArrowCursor = function() {  // Arrow
+    document.documentElement.style.cursor = arrowCursor;
+  }
+  sfig.setPointerCursor = function() {  // Hand
     document.documentElement.style.cursor = 'pointer';
   }
   sfig.resetCursor = function() {
@@ -90,7 +108,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.hideCursor = function() {
     document.documentElement.style.cursor = 'none';
   }
-  sfig.setLaserPointerCursor = function() {
+  sfig.setLaserPointerCursor = function() {  // Change default cursor
+    if (sfig.serverSide) return;
     sfig.defaultCursor = 'url("'+sfig.getInternalDir()+'/../images/red-dot.png"), auto';
     sfig.resetCursor();
   }
@@ -409,6 +428,18 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.serializeUrlParamsToLocation = function() {
     sfig_.urlHash = sfig_.serializeUrlParams(sfig_.urlParams);
     window.location.hash = sfig_.urlHash;
+  }
+
+  // Toggle between regular mode and new mode.
+  // Return whether we changed the mode to newMode.
+  sfig_.toggleMode = function(newMode) {
+    if (sfig_.urlParams.mode != newMode) {
+      sfig_.urlParams.mode = newMode;
+      return true;
+    } else {
+      sfig_.urlParams.mode = null;
+      return false;
+    }
   }
 })();
 
@@ -890,7 +921,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addPairProperty(Block, 'level', 'showLevel', 'hideLevel', null, null, 'Levels at which this object is available.');
   Block.prototype.numLevels = function(n) { return this.hideLevel(this.showLevel().add(n)); } // How long to display this object
 
-  sfig_.addProperty(Block, 'offline', null, 'Is this Block offline, which means that it shouldn\'t be shown in the presentation?');
   sfig_.addProperty(Block, 'orphan', null, 'Orphans do not contribute to the bounding box of its parent.');
   sfig_.addPairProperty(Block, 'parentPivot', 'xparentPivot', 'yparentPivot', null, null, 'Pivot used by parent.');
 
@@ -899,8 +929,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.parentLeft = function(block) { return sfig.std(block).xparentPivot(-1); }
   sfig.parentRight = function(block) { return sfig.std(block).xparentPivot(+1); }
 
+  sfig_.addProperty(Block, 'cursor', null, 'What cursor to use when mouseover.');
   sfig_.addProperty(Block, 'tooltip', null, 'String to display when mouseover.');
   sfig_.addProperty(Block, 'onClick', null, 'Function to call when object is clicked.');
+  sfig_.addProperty(Block, 'onDblclick', null, 'Function to call when object is double clicked.');
   sfig_.addProperty(Block, 'onMouseover', null, 'Function to call when mouse moves over object.');
   sfig_.addProperty(Block, 'onMouseout', null, 'Function to call when mouse moves out of object.');
   sfig_.addProperty(Block, 'onShow', null, 'Function to call when object is shown.');
@@ -1282,8 +1314,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // TODO: works in Chrome, but doesn't work in Firefox
     if (this.tooltip().get() != null) sfig_.addTooltipToElem(this.elem, this.tooltip().get());
     if (this.onClick().get() != null) this.elem.onclick = sfig_.funcPrependArg(this.onClick().get(), this);
+    if (this.onDblclick().get() != null) this.elem.ondblclick = sfig_.funcPrependArg(this.onDblclick().get(), this);
     if (this.onMouseover().get() != null) this.elem.onmouseover = sfig_.funcPrependArg(this.onMouseover().get(), this);
     if (this.onMouseout().get() != null) this.elem.onmouseout = sfig_.funcPrependArg(this.onMouseout().get(), this);
+
+    if (this.cursor().get() != null) this.elem.style.cursor = this.cursor().get();
 
     var partTooltip = this.partTooltip().get();
     if (partTooltip != null) {
@@ -1394,14 +1429,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.children.forEach(function(child) { child.log(indent + '  '); });
   }
 
-  // Helper function
-  Block.prototype.setPointerWhenMouseOver = function() {
-    // TODO: do this by changing cursor property
-    // TODO: highlight the link (e.g., change color)
-    this.onMouseover(function() { sfig.setPointerCursor(); });
-    this.onMouseout(function() { sfig.resetCursor(); });
-    return this;
-  }
+  Block.prototype.setPointerWhenMouseOver = function() { return this.cursor('pointer'); }
 
   Block.prototype.linkToUrl = function(url) {
     this.onClick(function() { window.open(url); });
@@ -1466,7 +1494,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
         var ul = sfig_.newElem('ul');
         ul.style.margin = 0;
         for (var i = 1; i < content.length; i++) {
-          if (content[i] == _) continue;
           var li = sfig_.newElem('li');
           //li.style.listStyleType = 'square';
           //li.style.listStyleImage = 'url("'+sfig.getInternalDir()+'/../images/blue-sphere.png")';
@@ -1506,6 +1533,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var content = this.content().getOrDie();
     if (this.bulleted().get()) {
       if (sfig.isString(content)) content = [null, content];
+      content = sfig_.removeIgnoreObject(content);
       content = Text.bulletize(content);
     }
 
@@ -2762,17 +2790,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
     };
   }
 
-  // Return the number of slides that we have to move in direction |dir|
-  // before we hit a non-offline slide.
+  // Return |dir| if we can move in that direction.
   Presentation.prototype.distanceToNeighboringSlide = function(dir) {
-    var total = dir;
-    while (true) {
-      var slide = this.slides[this.currSlideIndex+total];
-      if (!slide) return 0;
-      if (sfig_.urlParams.includeOffline || !slide.offline().get()) break;
-      total += dir;
-    }
-    return total;
+    var slide = this.slides[this.currSlideIndex+dir];
+    if (!slide) return 0;
+    return dir;
   }
 
   Presentation.prototype.showNextSlide = function(firstLevel, callback) {
@@ -2850,12 +2872,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
       self.showPrevSlide(false, callback);
     });
 
-    this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
-      var query = prompt('Go to which presentation (name)?');
-      if (query == null) return callback();
-      sfig_.goToPresentation(query, null, null, true);
-    });
-
     function containsText(block, query) {
       if (block instanceof sfig.Text) {
         var content = (block.content().get() || '').toString();
@@ -2896,21 +2912,35 @@ sfig.down = function(x) { return x * sfig.downSign; };
       });
     });
 
-    this.registerKey('Toggle full screen', ['shift-f'], function(callback) {
-      if (sfig_.urlParams.mode != 'fullScreen')
-        sfig_.urlParams.mode = 'fullScreen';
-      else
-        sfig_.urlParams.mode = '';
+    this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
+      var query = prompt('Go to which presentation (name)?');
+      if (query == null) return callback();
+      sfig_.goToPresentation(query, null, null, true);
+    });
+
+    this.registerKey('Mode: full screen', ['shift-f'], function(callback) {
+      sfig_.toggleMode('fullScreen');
       sfig_.serializeUrlParamsToLocation();
       window.location.reload();
     });
-    this.registerKey('Outline version', ['shift-o'], function(callback) {
-      sfig_.urlParams.mode = 'outline';
+    this.registerKey('Mode: outline', ['shift-o'], function(callback) {
+      sfig_.toggleMode('outline');
       sfig_.serializeUrlParamsToLocation();
       window.location.reload();
     });
-    this.registerKey('Printer-friendly version', ['shift-p'], function(callback) {
-      sfig_.urlParams.mode = 'print';
+    this.registerKey('Mode: print (big)', ['p'], function(callback) {
+      if (sfig_.toggleMode('print')) {
+        sfig_.urlParams.numColsPerPage = 1;
+        sfig_.urlParams.numRowsPerPage = 1;
+      }
+      sfig_.serializeUrlParamsToLocation();
+      window.location.reload();
+    });
+    this.registerKey('Mode: print (small)', ['shift-p'], function(callback) {
+      if (sfig_.toggleMode('print')) {
+        sfig_.urlParams.numColsPerPage = 2;
+        sfig_.urlParams.numRowsPerPage = 3;
+      }
       sfig_.serializeUrlParamsToLocation();
       window.location.reload();
     });
@@ -2975,12 +3005,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
       document.onmousewheel = handleMouseWheel;
       document.documentElement.addEventListener('DOMMouseScroll', handleMouseWheel, false);
     }
-
-    /*document.documentElement.addEventListener('dblclick', function(event) {
-      self.keyQueue.push('down');
-      processKeyQueue(function() {});
-      sfig.L('click');
-    }, false);*/
   }
 
   Presentation.prototype.getHelpBlock = function() {
@@ -3073,8 +3097,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
         desiredWidth = screen.availWidth * scale;
         desiredHeight = screen.availHeight * scale;
       } else if (sfig_.urlParams.mode == 'print') {  // Print to fit the paper
-        var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
-        var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
+        var numRowsPerPage = parseInt(sfig_.urlParams.numRowsPerPage) || sfig.defaultPrintNumRowsPerPage;
+        var numColsPerPage = parseInt(sfig_.urlParams.numColsPerPage) || sfig.defaultPrintNumColsPerPage;
         var scale;
         if (numColsPerPage == 1) scale = numRowsPerPage == 1 ? 1 : 0.7;
         else if (numColsPerPage == 2) scale = 0.4;
@@ -3379,14 +3403,18 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Some default ones
   var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
-  sfig.latexMacro('red', 1, '\\'+colorCmd+'{red}{#1}');
-  sfig.latexMacro('blue', 1, '\\'+colorCmd+'{blue}{#1}');
-  sfig.latexMacro('green', 1, '\\'+colorCmd+'{green}{#1}');
-  sfig.latexMacro('darkblue', 1, '\\'+colorCmd+'{darkblue}{#1}');
-  if (sfig.serverSide) {
-    // TODO: macros aren't nested unfortunately
-    sfig.latexMacro('footnotesize', 1, '#1');
-  }
+
+  sfig.colors = ['red', 'blue', 'green', 'purple', 'brown', 'darkblue', 'orange', 'black', 'white'];
+  sfig.colors.forEach(function(color) {
+    sfig.latexMacro(color, 1, '\\'+colorCmd+'{'+color+'}{#1}');
+    sfig[color] = function(x) { return x.fontcolor(color); };
+    sfig[color+'bold'] = function(x) { return x.fontcolor(color).bold(); };
+    sfig[color+'italics'] = function(x) { return x.fontcolor(color).italics(); };
+  });
+
+  sfig.bold = function(s) { return s.bold(); }
+  sfig.italics = function(s) { return s.italics(); }
+  sfig.tt = function(s) { return '<tt>' + s + '</tt>'; }
 
   // Note: this requires cross origin scripting
   // For Chrome, either of the following will do the trick:
