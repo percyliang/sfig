@@ -249,7 +249,7 @@ function isLeaf(block) {
 
   MetapostExpr.text = function(str, useRawBounds, fontSize) {
     var h = useRawBounds ? '' : '; hackTextBounds';
-    var data = 'image(draw btex '+str+' etex'+h+') scaled ' + (fontSize / 10.0);
+    var data = 'image(draw btex '+str+' etex'+h+') scaled ' + (fontSize / 11.0);
     return MetapostExpr.picture(data);
   }
 
@@ -376,6 +376,7 @@ function isLeaf(block) {
       if (content.length > 1) {
         result.push('\\begin{itemize}');
         result.push('\\setlength{\\itemsep}{0pt}');
+        //result.push('\\setlength{\\leftmargin}{0em}');  // Doesn't work
         for (var i = 1; i < content.length; i++) {
           result.push('\\item ' + bulletizeLatex(content[i]));
         }
@@ -396,14 +397,29 @@ function isLeaf(block) {
     for (var i = 0; i <= str.length; i++) {
       var c = str[i];
       if (i == str.length || (c == '$' && str[i-1] != '\\')) {
-        if (inMathMode) {  // Include '$'
+        if (inMathMode) {  // Note: include final '$'
           newStr += str.substring(start, i+1);
           start = i+1;
-        } else {  // Exclude $
+        } else {  // Note: exclude initial '$'
           newStr += func(str.substring(start, i));
           start = i; 
         }
         inMathMode = !inMathMode;
+      } else {
+        var m = str.substring(i).match(/^(\\begin\{\w+\})/);
+        if (m) {
+          if (inMathMode) console.log("Error: can\'t have nested math modes: " + str);
+          newStr += func(str.substring(start, i));
+          start = i;
+          inMathMode = true;
+        }
+        var m = str.substring(i).match(/^(\\end\{\w+\})/);
+        if (m) {
+          if (!inMathMode) console.log("Error: closing without opening: " + str);
+          newStr += str.substring(start, i + m[0].length);
+          start = i + m[0].length;
+          inMathMode = false;
+        }
       }
     }
     return newStr;
@@ -413,6 +429,8 @@ function isLeaf(block) {
     if (!content) return content;
     if (content == _) return content;
     if (content instanceof Array) return content.map(makeLatexFriendly);
+
+    if (content == '&nbsp;') return '\\ %'; // Need to put a % or else metapost doesn't interpret "\\ " properly.
 
     if (typeof(content) != 'string') {
       sfig.L(content);
@@ -435,6 +453,11 @@ function isLeaf(block) {
     content = content.replace(/&uuml;/g, '\\"u');
     content = content.replace(/&nbsp;/g, '\\ ');
 
+    content = content.replace(/&lt;/g, '$<$');
+    content = content.replace(/&gt;/g, '$>$');
+    content = content.replace(/&le;/g, '$\\le$');
+    content = content.replace(/&ge;/g, '$\\ge$');
+
     content = content.replace(/%/g, '\\%');
     content = content.replace(/#/g, '\\#');
 
@@ -452,12 +475,13 @@ function isLeaf(block) {
     // Metapost: doesn't seem to support both italics and bold, whereas normal Latex does.
     while (true) {
       var oldContent = content;
-      content = content.replace(/<b>([^<]+)<\/b>/g, '\\textbf{$1}');
-      content = content.replace(/<i>([^<]*)<\/i>/g, '\\textit{$1}');
-      content = content.replace(/<tt>([^<]*)<\/tt>/g, '\\texttt{$1}');
-      content = content.replace(/<del>([^<]*)<\/del>/g, '\\sout{$1}');
-      content = content.replace(/<ins>([^<]*)<\/ins>/g, '\\uline{$1}');
-      content = content.replace(/<font color="([^>]+)">([^<]*)<\/font>/g, '\\textcolor{$1}{$2}');
+      content = content.replace(/<b>/g, '\\textbf{');
+      content = content.replace(/<i>/g, '\\textit{');
+      content = content.replace(/<tt>/g, '\\texttt{');
+      content = content.replace(/<del>/g, '\\sout{');
+      content = content.replace(/<ins>/g, '\\uline{');
+      content = content.replace(/<font color="([^>]+)">/g, '\\textcolor{$1}{');
+      content = content.replace(/<\/[a-z]+>/g, '}');  // Closing tag
       if (oldContent == content) break;
     }
     return content;
@@ -469,8 +493,39 @@ function isLeaf(block) {
 
     content = makeLatexFriendly(content);
 
+    // Handle different languages (make sure packages are included).
+    var language = this.language().get();
+    if (language == 'chinese')
+      content = '\\begin{CJK}{UTF8}{gbsn}'+content+'\\end{CJK}';
+    else if (language == 'arabic') {
+      // Apply color outside of the Arabic.
+      var m = content.match(/^(\\textcolor{\w+}{)([^}]+)(}.*)$/);
+      if (m)
+        content = m[1] + '\\<'+m[2]+'>' + m[3];
+      else
+        content = '\\<'+content+'>';
+    }
+
+    // In Metapost, autowrap = true means that we unfortunately have to take up
+    // the given width.
+    var autowrap = this.autowrap().get();
+    if (autowrap == null) {
+      // Hack: try to guess what is the appropriate behavior here.
+      // For short strings, don't autowrap.  For long ones, do.
+      // You should generally specify autowrap().
+      autowrap = strippedContent.length > 64 && !this.xparentPivot().exists();
+    }
+
+    var bulleted = this.bulleted().get() 
+    if (bulleted && sfig.isString(content) && !autowrap) {
+      // If we want a simple bullet, then just add the symbol without any fuss.
+      // This way, we can have short bullets that don't spill over.
+      bulleted = false;
+      content = '$\\bullet$ ' + content;
+    }
+
     // Put bullets.
-    if (this.bulleted().get()) {
+    if (bulleted) {
       if (sfig.isString(content)) content = [null, content];
       // Convert from width allowed for the text and inches
       // Note: in SVG, width() is an upper bound on how much space we'll take.
@@ -478,17 +533,13 @@ function isLeaf(block) {
       // We must use minipage for itemize, but also allows us to do wrapping.
       content = sfig_.removeIgnoreObject(content);
       content = bulletizeLatex(content);
+      autowrap = true;  // Need autowrap to do bulletizing.
     }
     content = content.toString();
 
     // In Metapost, wrapping means we have to put things in a minipage, which
     // means (unlike SVG) it takes up the entire allotted width.
-    var autowrap = this.bulleted().get() || this.autowrap().get();
-    if (autowrap == null) {
-      // Try to guess what is the appropriate behavior here.
-      // For short strings, don't autowrap.  For long ones, do.
-      autowrap = strippedContent.length > 64 && !this.xparentPivot().exists();
-    }
+    //var autowrap = this.bulleted().get() || this.autowrap().get();
     //L(strippedContent + ': ' + autowrap);
     if (autowrap) {
       var width = this.width().getOrDie() / 210;  // Hack: need to find right ratio
@@ -685,6 +736,7 @@ function isLeaf(block) {
   }
 
   sfig.Line.prototype.drawMetapost = function(writer) {
+    // NOTE: some properties like xlabel are not set.
     var path = createLinePath(writer, this, null);
     this.drawPath(writer, path);
   }
@@ -895,6 +947,10 @@ function isLeaf(block) {
       '\\documentclass{article}',
       '\\usepackage{color,amsmath,amssymb,ulem,verbatim,ifthen}',
       '\\renewcommand{\\familydefault}{'+family+'}');
+    
+    // Allow us to include Chinese and Arabic
+    this.verbatimTex('\\usepackage{CJKutf8,arabtex,utf8}');
+    this.verbatimTex('\\setcode{utf8}');
 
     this.verbatimTex.apply(this, Object.keys(sfig.MetapostExpr.colorMap).map(function(color) {
       var rgb = sfig.MetapostExpr.colorMap[color];
@@ -905,7 +961,9 @@ function isLeaf(block) {
     var lines = [];
     for (var name in sfig_.latexMacros) {
       var arityBody = sfig_.latexMacros[name];
-      lines.push('\\providecommand{\\'+name+'}['+arityBody[0]+']{'+arityBody[1]+'}');
+      // Foce the command to override previous commands
+      lines.push('\\providecommand{\\'+name+'}{}');
+      lines.push('\\renewcommand{\\'+name+'}['+arityBody[0]+']{'+arityBody[1]+'}');
     }
     this.verbatimTex.apply(this, lines);
 
@@ -1013,22 +1071,31 @@ function isLeaf(block) {
   };
 
   // outPath: Metapost file
-  function createMetapost(slide, outPath) {
+  function createMetapost(slide, outPath, opts) {
     var oldContents = Path.existsSync(outPath) ? fs.readFileSync(outPath) : '';
 
     // Create the Metapost file
     var writer = new MetapostWriter();
     slide.drawPicture(slide.state, writer);
 
+    // Compute |maxLevel|.
+    var maxLevel = 0;
+    function computeMaxLevel(block) {
+      var showLevel = block.showLevel().get();
+      var hideLevel = block.hideLevel().get();
+      if (showLevel != null) maxLevel = Math.max(maxLevel, showLevel);
+      if (hideLevel != null) maxLevel = Math.max(maxLevel, hideLevel);
+      if (block.children) block.children.forEach(computeMaxLevel);
+    }
+    computeMaxLevel(slide);
+
     // Go through all the leaves under |block|
     // and add the ones which are active at level.
     var E = sfig.MetapostExpr.ensureNumeric;
-    var maxLevel = 0;
     // |block| is added to |blocks| for level |currLevel| if
     // the intersection of all [showLevel, hideLevel] intervals of its
     // ancestors contains level.
     // showLevel and hideLevel: constraints imposed by answers of |block|.
-    // Along the way, update |maxLevel|.
     function getLeaves(block, currLevel, ancestralShowLevel, ancestralHideLevel, blocks) {
       // Add block to blocks if showLevel <= level < hideLevel
       // (if showLevel and hideLevel exist)
@@ -1037,24 +1104,25 @@ function isLeaf(block) {
       //sfig.L(block + ' ' + showLevel + ' ' + hideLevel);
       if (showLevel != null) {
         showLevel = E(showLevel).getPrimitiveNumber();
-        maxLevel = Math.max(maxLevel, showLevel);
         if (showLevel != -1 && showLevel > currLevel) return;
         ancestralShowLevel = Math.max(ancestralShowLevel, showLevel);
       }
       if (hideLevel != null) {
         hideLevel = E(hideLevel).getPrimitiveNumber();
-        maxLevel = Math.max(maxLevel, hideLevel);
         if (hideLevel != -1 && hideLevel <= currLevel) return;
         ancestralHideLevel = Math.min(ancestralHideLevel, hideLevel);
       }
-      if (isLeaf(block)) {
-        blocks.push(block);
-      } else {
-        block.children.forEach(function(child) { getLeaves(child, currLevel, ancestralShowLevel, ancestralHideLevel, blocks); });
+      if (showLevel != -1) {
+        if (isLeaf(block)) {
+          blocks.push(block);
+        } else {
+          block.children.forEach(function(child) { getLeaves(child, currLevel, ancestralShowLevel, ancestralHideLevel, blocks); });
+        }
       }
     }
 
-    for (var level = 0; level <= maxLevel; level++) {
+    var startLevel = opts.onlyFinalLevel ? maxLevel : 0;
+    for (var level = startLevel; level <= maxLevel; level++) {
       var activeBlocks = [];
       getLeaves(slide, level, 0, 1000000, activeBlocks);
       //sfig.L('======== ' + activeBlocks.join(' ; '));
@@ -1136,13 +1204,14 @@ function isLeaf(block) {
     var slideIndex = 0;
 
     var outPrefix = opts.outPrefix;
-    if (outPrefix == null) sfig.throwException('Missing outPrefix (will output to the directory outPrefix)');
+    if (outPrefix == null) sfig.throwException('Missing outPrefix (will output to the directory <outPrefix>.slides)');
+    var slidesPath = outPrefix == '.' ? '.' : outPrefix + '.slides';
 
-    // Combine if we're not writing to the current directory.
+    // Default: combine if we're not writing to the current directory.
     var combine = opts.combine;
     if (combine == null) combine = outPrefix != '.';
 
-    sfig_.queue.system('mkdir -p \'' + outPrefix + '\'');
+    sfig_.queue.system('mkdir -p \'' + slidesPath + '\'');
 
     // Compute all image sizes
     var seenPaths = {};
@@ -1164,10 +1233,10 @@ function isLeaf(block) {
       for (var slideIndex = 0; slideIndex < self.slides.length; slideIndex++) {
         var slide = self.slides[slideIndex];
         var id = slide.id().getOrElse(slideIndex);
-        var slidePrefix = outPrefix + '/' + id;
+        var slidePrefix = slidesPath + '/' + id;
         if (!opts.lazy || !Path.existsSync(slidePrefix + '.pdf')) {
           sfig.L('Slide ' + slideIndex + '/' + self.slides.length + ': ' + id + (slide.title ? ' [' + slide.title().get() + ']' : ''));
-          createMetapost(slide, slidePrefix + '.mp');
+          createMetapost(slide, slidePrefix + '.mp', opts);
         }
         paths.push(slidePrefix + '.pdf');
       }

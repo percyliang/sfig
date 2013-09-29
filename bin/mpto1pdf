@@ -33,6 +33,10 @@ p=$1; p=${p/\.mp/} # Prefix
 tmp=$p.tmp
 rm -rf $tmp || exit 1
 
+# Make sure after the end of the run, the pdf file (whether it got created or
+# not) corresponds to the mp file.
+rm -f $p.pdf || exit 1
+
 if [ $quiet == 1 ]; then
   out=../`basename $p`.log
 else

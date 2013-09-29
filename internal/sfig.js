@@ -881,6 +881,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addProperty(Block, 'id', null, 'Identifier of the slide');
 
   sfig_.addProperty(Animate, 'duration', '1s', 'Time to spend performing the animation');
+
+  // DEPRECATED: because too slick and hard to support in metapost.
   sfig_.addProperty(Block, 'replace', null, 'Object to hide when this object is shown.');
 
   // Transforms
@@ -1522,6 +1524,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Text.prototype.renderElem = function(state, callback) {
     var self = this;
 
+    if (this.language().exists()) {
+      if (document.characterSet != 'UTF-8')
+        console.log('Warning: document is ' + document.characterSet + ', needs to be UTF-8; put <meta charset="UTF-8"> in <head>');
+    }
+
     // Put text in a div
     var div = sfig_.newElem('div');
     div.style.display = 'inline-block'; // Needed by Firefox
@@ -1583,6 +1590,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addProperty(Text, 'fontSize', 28, 'Font size to use to display the text.');
   sfig_.addProperty(Text, 'width', null, 'Affects wrapping (default: Slide width)');
   sfig_.addProperty(Text, 'bulleted', null, 'Whether to prepend a bullet');
+  sfig_.addProperty(Text, 'language', null, 'What language (e.g., chinese, arabic, etc.) for Metapost');
 
   // By default, sfig tries to figure out if autowrap is needed.
   sfig_.addProperty(Text, 'autowrap', null, 'Whether to autowrap text at the specified width');
@@ -1595,6 +1603,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.text = function(content) { return new Text().content(content); }
   sfig.bulletedText = function(content) { return sfig.text(content).bulleted(true); }
   sfig.nowrapText = function(content) { return sfig.text(content).autowrap(false); }
+  sfig.chineseText = function(content) { return sfig.text(content).language('chinese'); }
+  sfig.arabicText = function(content) { return sfig.text(content).language('arabic'); }
 })();
 
 ////////////////////////////////////////////////////////////
@@ -1842,6 +1852,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   sfig.image = function(href) { return new Image().href(href); }
 
+  // DEPRECATED
   sfig_.cachedCommands = ['mkdir -p cached-images'];
   sfig.cachedImage = function(href) {
     var tokens = href.split('/');
@@ -2886,11 +2897,24 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (!self.readyForSlideShowKey()) return callback();
       var query = prompt('Go to which slide (<slide id> or <slide index> or [/?]<search query>)?');
       if (query == null) return callback();
+      processJumpQuery(query, callback);
+    });
+
+    this.registerKey('Search again', ['n'], function(callback) {
+      if (!self.readyForSlideShowKey()) return callback();
+      if (!lastTextSearchQuery) return callback();
+      processJumpQuery(lastTextSearchQuery, callback);
+    });
+
+    var lastTextSearchQuery = null;
+
+    function processJumpQuery(query, callback) {
       if (parseInt(query) < 0) query = self.slides.length + parseInt(query);
       var slideIndex = self.currSlideIndex;
       var isTextSearch = query[0] == '/' || query[0] == '?';
       var incr = query[0] == '?' ? -1 : +1;
       var found = false;
+      if (isTextSearch) lastTextSearchQuery = query;
       while (true) {
         slideIndex = (slideIndex + incr + self.slides.length) % self.slides.length;  // Advance slide
         if (slideIndex == self.currSlideIndex) break;  // Wrapped around
@@ -2910,13 +2934,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
         self.updateUrlParams();
         callback();
       });
-    });
+    }
 
-    this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
+    /*this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
       var query = prompt('Go to which presentation (name)?');
       if (query == null) return callback();
       sfig_.goToPresentation(query, null, null, true);
-    });
+    });*/
 
     this.registerKey('Mode: full screen', ['shift-f'], function(callback) {
       sfig_.toggleMode('fullScreen');
@@ -3301,7 +3325,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
       var title = sfig_.newElem('a');
       title.innerHTML = ('Slide ' + i + (slide.title && slide.title().get() ? ': '+slide.title().get() : '')).bold();
-      title.href = window.location.pathname + sfig_.serializeUrlParams({slideIndex: i});
+      var newParams = sfig_.mergeInto({}, sfig_.urlParams);
+      newParams.slideIndex = i;
+      newParams.level = null;
+      newParams.mode = null;
+      title.href = window.location.pathname + sfig_.serializeUrlParams(newParams);
       div.appendChild(title);
 
       var html = blockToHtml(slide, false);

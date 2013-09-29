@@ -180,7 +180,7 @@
         axisLabel.rotate(axisLabelRotate);
         this.axisLabelBlock = sfig.transform(axisLabel);
         if (axis == 0)
-          this.axisLabelBlock.pivot(0, -1).shift(length / 2, axisLabelPadding);
+          this.axisLabelBlock.pivot(0, -1).shiftBy(length / 2, axisLabelPadding);
         else
           this.axisLabelBlock.pivot(1, 0).shiftBy(-axisLabelPadding, -length / 2);
         this.addChild(this.axisLabelBlock);
