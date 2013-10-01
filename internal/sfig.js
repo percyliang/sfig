@@ -3434,7 +3434,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   sfig.colors = ['red', 'blue', 'green', 'purple', 'brown', 'darkblue', 'orange', 'black', 'white'];
   sfig.colors.forEach(function(color) {
-    sfig.latexMacro(color, 1, '\\'+colorCmd+'{'+color+'}{#1}');
+    sfig.latexMacro(color, 1, '{\\'+colorCmd+'{'+color+'}{#1}}');
     sfig[color] = function(x) { return x.fontcolor(color); };
     sfig[color+'bold'] = function(x) { return x.fontcolor(color).bold(); };
     sfig[color+'italics'] = function(x) { return x.fontcolor(color).italics(); };
