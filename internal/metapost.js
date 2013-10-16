@@ -275,6 +275,7 @@ function isLeaf(block) {
 
   // Override behavior to work with MetapostExpr
   var Thunk = sfig.Thunk;
+  Thunk.abs = function(a) { return a == null ? null : MetapostExpr.ensureNumeric(a).abs(); }
   Thunk.add = function(a, b) { return a == null || b == null ? null : MetapostExpr.ensureNumeric(a).add(b); }
   Thunk.sub = function(a, b) { return a == null || b == null ? null : MetapostExpr.ensureNumeric(a).sub(b); }
   Thunk.mul = function(a, b) { return a == null || b == null ? null : MetapostExpr.ensureNumeric(a).mul(b); }
@@ -406,15 +407,15 @@ function isLeaf(block) {
         }
         inMathMode = !inMathMode;
       } else {
-        var m = str.substring(i).match(/^(\\begin\{\w+\})/);
-        if (m) {
+        var m = str.substring(i).match(/^\\begin\{(\w+)\}/);
+        if (m && m[1] != 'cases') {
           if (inMathMode) console.log("Error: can\'t have nested math modes: " + str);
           newStr += func(str.substring(start, i));
           start = i;
           inMathMode = true;
         }
-        var m = str.substring(i).match(/^(\\end\{\w+\})/);
-        if (m) {
+        var m = str.substring(i).match(/^\\end\{(\w+)\}/);
+        if (m && m[1] != 'cases') {
           if (!inMathMode) console.log("Error: closing without opening: " + str);
           newStr += str.substring(start, i + m[0].length);
           start = i + m[0].length;
@@ -720,7 +721,7 @@ function isLeaf(block) {
         var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
 
         if (d1) {
-          var d1frac = extraLength.div(dist);
+          var d1frac = sfig.MetapostExpr.numeric(extraLength).div(dist);
           newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
         }
         if (d2) {

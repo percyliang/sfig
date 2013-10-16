@@ -577,6 +577,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Thunk.prototype.apply = function(f) { return tfunc('apply', apply, [this, f]); }
 
   // Can override if needed.
+  Thunk.abs = function(a) { return Math.abs(a); }
   Thunk.add = function(a, b) { return a == null || b == null ? null : a + b; }
   Thunk.sub = function(a, b) { return a == null || b == null ? null : a - b; }
   Thunk.mul = function(a, b) { return a == null || b == null ? null : a * b; }
@@ -593,6 +594,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Thunk.down = function(a, b) { return a == null || b == null ? null : a + b * sfig.downSign; }
   Thunk.downHalf = function(a, b) { return a == null || b == null ? null : a + b/2 * sfig.downSign; }
 
+  Thunk.prototype.abs = function() { return tfunc('abs', Thunk.abs, [this]); }
   Thunk.prototype.add = function(x) { return tfunc('add', Thunk.add, [this, x]); }
   Thunk.prototype.sub = function(x) { return tfunc('sub', Thunk.sub, [this, x]); }
   Thunk.prototype.mul = function(x) { return tfunc('mul', Thunk.mul, [this, x]); }
@@ -603,8 +605,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Thunk.prototype.or = function(x) { return tfunc('or', Thunk.or, [this, x]); }
   Thunk.prototype.not = function() { return tfunc('not', Thunk.not, [this]); }
   Thunk.prototype.cond = function(a, b) { return tfunc('not', Thunk.cond, [this, a, b]); }
-  Thunk.prototype.up = function(x) { return tfunc('div', Thunk.up, [this, x]); }
-  Thunk.prototype.down = function(x) { return tfunc('div', Thunk.down, [this, x]); }
+  Thunk.prototype.up = function(x) { return tfunc('up', Thunk.up, [this, x]); }
+  Thunk.prototype.down = function(x) { return tfunc('down', Thunk.down, [this, x]); }
 })();
 
 ////////////////////////////////////////////////////////////
