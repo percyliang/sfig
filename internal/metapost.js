@@ -215,12 +215,16 @@ function isLeaf(block) {
     pink: '#FAAFBE',
   };
   // Replace with hexcolor
-  for (var color in MetapostExpr.colorMap)
+  for (var color in MetapostExpr.colorMap) {
     MetapostExpr.colorMap[color] = MetapostExpr.hexcolor(MetapostExpr.colorMap[color]);
+  }
   MetapostExpr.ensureColor = function(color) {
     if (color instanceof MetapostExpr) return color;
     if (color in MetapostExpr.colorMap) return MetapostExpr.colorMap[color];
     if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
+    var m = color.match(/^rgb\((.+),(.+),(.+)\)$/);
+    if (m)
+      return MetapostExpr.color([parseInt(m[1]), parseInt(m[2]), parseInt(m[3])]);
     sfig.throwException('Unknown color: ' + color);
   }
 
@@ -433,6 +437,7 @@ function isLeaf(block) {
 
     if (content == '&nbsp;') return '\\ %'; // Need to put a % or else metapost doesn't interpret "\\ " properly.
 
+    if (typeof(content) == 'number') content = content.toString();
     if (typeof(content) != 'string') {
       sfig.L(content);
       throw content + ' is not a string, but is ' + typeof(content);
@@ -514,18 +519,19 @@ function isLeaf(block) {
       // Hack: try to guess what is the appropriate behavior here.
       // For short strings, don't autowrap.  For long ones, do.
       // You should generally specify autowrap().
-      autowrap = strippedContent.length > 64 && !this.xparentPivot().exists();
+      autowrap = (strippedContent.length > 64 && !this.xparentPivot().exists());
     }
 
-    var bulleted = this.bulleted().get() 
+    /*var bulleted = this.bulleted().get() 
     if (bulleted && sfig.isString(content) && !autowrap) {
       // If we want a simple bullet, then just add the symbol without any fuss.
       // This way, we can have short bullets that don't spill over.
       bulleted = false;
       content = '$\\bullet$ ' + content;
-    }
+    }*/
 
     // Put bullets.
+    var bulleted = this.bulleted().get();
     if (bulleted) {
       if (sfig.isString(content)) content = [null, content];
       // Convert from width allowed for the text and inches
