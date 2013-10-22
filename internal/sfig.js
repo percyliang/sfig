@@ -2231,10 +2231,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.eqTriangle = function(side) {
     var length = side * 0.5 * Math.sqrt(3);
     var width = side;
-    return sfig.polygon([0,0], [-width/2, length], [+width/2, length]);
+    return sfig.polygon([0,0], [-width/2, sfig.down(length)], [+width/2, sfig.down(length)]);
   }
   sfig.xline = function(length) { return sfig.polyline([0, 0], [length, 0]); }
-  sfig.yline = function(length) { return sfig.polyline([0, 0], [0, length]); }
+  sfig.yline = function(length) { return sfig.polyline([0, 0], [0, sfig.down(length)]); }
 
   sfig.xspace = function(length) { return sfig.xline(length).opacity(0); }
   sfig.yspace = function(length) { return sfig.yline(length).opacity(0); }

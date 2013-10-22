@@ -93,7 +93,6 @@
         b.edge.line.p1(this.headBox.xmiddle(), this.headBox.bottom());
         b.edge.line.p2(b.child.headBox.xmiddle(), b.child.headBox.top());
       } else {
-        // TODO: with this option, clipping doesn't work properly
         // Edges meeting at the center of headBox
         b.edge.line.b1(this.headBox);
         b.edge.line.b2(b.child.headBox);

@@ -654,7 +654,7 @@ function isLeaf(block) {
       // Need to draw stroke, not fill.
       this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
     } else {
-      // Both are specified and have different colors.
+      // Both fillColor and strokeColor are specified and are different.
       var pic = writer.store(sfig.MetapostExpr.nullpicture);
       writer.addToPicture(pic, sfig.MetapostExpr.fill(path, getFillOptions(this)));
       writer.addToPicture(pic, sfig.MetapostExpr.draw(path, getDrawOptions(this)));
@@ -719,8 +719,8 @@ function isLeaf(block) {
     if (decoratedBlock instanceof sfig.DecoratedLine) {
       var d1 = decoratedBlock.drawArrow1().get();
       var d2 = decoratedBlock.drawArrow2().get();
+      var newp1 = p1, newp2 = p2;
       if (d1 || d2) {
-        var newp1 = p1, newp2 = p2;
         var dist = p1.distance(p2);
         dist = writer.storeIfComplex(dist);
         // How much an arrow is going to spill over
@@ -734,8 +734,8 @@ function isLeaf(block) {
           var d2frac = dist.sub(extraLength).div(dist);
           newp2 = sfig.MetapostExpr.mediation(d2frac, p1, p2);
         }
-        path = sfig.MetapostExpr.path([newp1, sep, newp2]);
       }
+      path = sfig.MetapostExpr.path([newp1, sep, newp2]);
     } else {
       path = sfig.MetapostExpr.path([p1, sep, p2]);
     }
@@ -1056,23 +1056,25 @@ function isLeaf(block) {
     this.verbatim('beginfig(' + this.numPages + ');');
     this.numPages++;
     activeBlocks.forEach(function(block) {
-      var pic = block.pic;
+      self.verbatim('draw ' + block.pic + ';');
+    });
 
-      // Print out image separately
-      if (block instanceof sfig.Image) {
-        self.verbatim('draw ' + pic + ';');
-        var file = Path.resolve(block.href().get());
-        if (!Path.existsSync(file))
-          sfig.throwException('File does not exist: ' + file);
-        self.verbatim([
-          'externalfigure',
-          '"'+file+'"',
-          'xyscaled', self.store(sfig.MetapostExpr.xypair(pic.realWidth(), pic.realHeight())),
-          'shifted', self.store(sfig.MetapostExpr.xypair(pic.left(), pic.top().down(pic.realHeight()))),
-        ].join(' ') + ';');
-      } else {
-        self.verbatim('draw ' + pic + ';');
-      }
+    // Draw images
+    // Important: put externalfigure after all calls to draw.
+    // Otherwise, the Metapost messes up the positioning when there are rotations above it.
+    // I don't understand why.
+    activeBlocks.forEach(function(block) {
+      var pic = block.pic;
+      if (!(block instanceof sfig.Image)) return;
+      var file = Path.resolve(block.href().get());
+      if (!Path.existsSync(file))
+        sfig.throwException('File does not exist: ' + file);
+      self.verbatim([
+        'externalfigure',
+        '"'+file+'"',
+        'xyscaled', self.store(sfig.MetapostExpr.xypair(pic.realWidth(), pic.realHeight())),
+        'shifted', self.store(sfig.MetapostExpr.xypair(pic.left(), pic.top().down(pic.realHeight()))),
+      ].join(' ') + ';');
     });
     this.verbatim('endfig;');
   };
