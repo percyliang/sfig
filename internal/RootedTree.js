@@ -119,6 +119,22 @@
   sfig_.addProperty(RootedTree, 'verticalCenterEdges', null, 'For drawing parse trees, have edges converge');
   sfig_.addProperty(RootedTree, 'tail', null, 'Draw this after everything');
 
+  RootedTree.prototype.bareHead = function() {
+    this.nodePadding(0);
+    this.nodeBorderWidth(0);
+    var frame = this.headBox.content;
+    // Make the frame bg and title orphaned so arrows can connect directly to the head
+    // TODO: this is hacky because it relies on the internal structure of a frame
+    frame.overlay.items[0].orphan(true);
+    return this;
+  }
+  RootedTree.prototype.recbareHead = function() {
+    this.bareHead();
+    for (var i = 0; i < this.branches.length; i++)
+      this.branches[i].child.bareHead();
+    return this;
+  }
+
   // Add ways to recursively set properties for all descendants.
   function addRecursiveProperty(recursiveName, name) {
     RootedTree.prototype[recursiveName] = function() {
