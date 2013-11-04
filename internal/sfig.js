@@ -3514,7 +3514,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.parseUrlParamsFromLocation();
 
     // Make custom sfig fonts available.
-    sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
+    if (Text.defaults.getProperty('font') == 'Noto Sans')
+      sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
 
     if (sfig.enableMath) {
       sfig_.initMathJax(
