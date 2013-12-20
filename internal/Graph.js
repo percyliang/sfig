@@ -262,7 +262,6 @@
 
   // Marker
   sfig_.addProperty(Graph, 'marker', null, 'Function mapping trajectory to a marker object');
-  sfig_.addProperty(Graph, 'markerSize', null, 'How big should the marker be?');
   sfig_.addProperty(Graph, 'yvalueScale', null, 'Display y value above with this size');
 })();
 
