@@ -469,7 +469,6 @@ function isLeaf(block) {
 
     // Quote these things outside math mode
     content = mapNonMathMode(content, function(s) {
-      s = s.replace(/&/g, '\\&');
       s = s.replace(/_/g, '\\_');
       s = s.replace(/{/g, '\\{');
       s = s.replace(/}/g, '\\}');
