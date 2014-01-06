@@ -125,8 +125,8 @@ function isLeaf(block) {
 
   // Return distance between points this and p
   MetapostExpr.prototype.distance = function(p) {
-    var xdiff = this.x().sub(p.x());
-    var ydiff = this.y().sub(p.y());
+    var xdiff = this.x().sub(p.x()).abs();
+    var ydiff = this.y().sub(p.y()).abs();
     if (xdiff.isZero()) return ydiff;
     if (ydiff.isZero()) return xdiff;
     return new MetapostExpr('numeric', '++', [xdiff, ydiff]);
@@ -756,6 +756,7 @@ function isLeaf(block) {
         // HACK
         var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.72;
 
+        // Scale back so the arrow fits within the allotted length
         if (d1) {
           var d1frac = sfig.MetapostExpr.numeric(extraLength).div(dist);
           newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
