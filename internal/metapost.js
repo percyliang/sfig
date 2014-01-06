@@ -645,6 +645,36 @@ function isLeaf(block) {
       else  // No arrow
         this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
 
+      // For some reason, thick lines don't end up with the right bounding box, so have to fix it up.
+      // HACK: only do this when lines are axis-aligned and absolute positions are given
+      var x1 = this.line.x1().get();
+      var y1 = this.line.y1().get();
+      var x2 = this.line.x2().get();
+      var y2 = this.line.y2().get();
+      var strokeWidth = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth);
+      if (x1 != null && y1 != null && x2 != null && y2 != null) {
+        var widthFixup = (d1 || d2) ? 0.175 * strokeWidth : 0;  // Only fix if arrow
+        var lengthFixup = 0.5 * strokeWidth;
+        var lengthArrowFixup = (strokeWidth == 1) ? 0.5 : 1.22 * strokeWidth;
+
+        if (y1 == y2) {  // Horizontal
+          var std_d1 = d1, std_d2 = d2;
+          if (x1 > x2) { std_d1 = d2; std_d2 = d1; }
+          var left = std_d1 ? this.pic.left().sub(lengthArrowFixup) : this.pic.left().add(lengthFixup);
+          var right = std_d2 ? this.pic.right().add(lengthArrowFixup) : this.pic.right().sub(lengthFixup);
+          var top = this.pic.top().up(widthFixup);
+          var bottom = this.pic.bottom().down(widthFixup);
+          writer.setBounds(this.pic, sfig.MetapostExpr.rect(left, top, right, bottom));
+        } else if (x1 == x2) {  // Vertical
+          var std_d1 = d1, std_d2 = d2;
+          if ((y2 - y1) * sfig.downSign < 0) { std_d1 = d2; std_d2 = d1; }
+          var top = std_d1 ? this.pic.top().up(lengthArrowFixup) : this.pic.top().down(lengthFixup);
+          var bottom = std_d2 ? this.pic.bottom().down(lengthArrowFixup) : this.pic.bottom().up(lengthFixup);
+          var left = this.pic.left().sub(widthFixup);
+          var right = this.pic.right().add(widthFixup);
+          writer.setBounds(this.pic, sfig.MetapostExpr.rect(left, top, right, bottom));
+        }
+      }
       return;
     }
     
@@ -723,7 +753,8 @@ function isLeaf(block) {
         var dist = p1.distance(p2);
         dist = writer.storeIfComplex(dist);
         // How much an arrow is going to spill over
-        var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
+        // HACK
+        var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.72;
 
         if (d1) {
           var d1frac = sfig.MetapostExpr.numeric(extraLength).div(dist);
