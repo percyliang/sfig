@@ -44,22 +44,23 @@ G.prez = sfig.presentation();
 G.frameBox = function(a) { return frame(a).bg.strokeWidth(1).fillColor('white').end; }
 G.bigFrameBox = function(a) { return frameBox(a).padding(10).scale(1.4); }
 
+G.bigArrow = function(a, b) { return arrow(a, b).strokeWidth(10).color('brown'); }
 G.bigLeftArrow = function(s) { return leftArrow(s || 100).strokeWidth(10).color('brown'); }
 G.bigRightArrow = function(s) { return rightArrow(s || 100).strokeWidth(10).color('brown'); }
 G.bigUpArrow = function(s) { return upArrow(s || 100).strokeWidth(10).color('brown'); }
 G.bigDownArrow = function(s) { return downArrow(s || 100).strokeWidth(10).color('brown'); }
 
-G.red = function(x) { return x.fontcolor('red'); }
-G.green = function(x) { return x.fontcolor('green'); }
-G.blue = function(x) { return x.fontcolor('blue'); }
-G.darkblue = function(x) { return x.fontcolor('darkblue'); }
-G.brown = function(x) { return x.fontcolor('brown'); }
-G.purple = function(x) { return x.fontcolor('purple'); }
-
 G.xseq = function() { return new sfig.Table([arguments]).center().margin(5); }
 G.yseq = function() { return ytable.apply(null, arguments).margin(10); }
 
-G.stmt = function(prefix, suffix) { return prefix.fontcolor('darkblue') + ':' + (suffix ? ' '+suffix : ''); }
+G.stmt = function(prefix, suffix) {
+  var m;
+  if (!suffix && (m = prefix.match(/^([^:]+): (.+)$/))) {
+    prefix = m[1];
+    suffix = m[2];
+  }
+  return prefix.fontcolor('darkblue') + ':' + (suffix ? ' '+suffix : '');
+}
 G.headerList = function(title) {
   var contents = Array.prototype.slice.call(arguments).slice(1);
   return ytable.apply(null, [title ? stmt(title) : _].concat(contents.map(function(line) {
