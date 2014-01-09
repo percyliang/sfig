@@ -224,7 +224,7 @@ function isLeaf(block) {
     if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
     var m = color.match(/^rgb\((.+),(.+),(.+)\)$/);
     if (m)
-      return MetapostExpr.color([parseInt(m[1]), parseInt(m[2]), parseInt(m[3])]);
+      return MetapostExpr.color([parseInt(m[1])/256, parseInt(m[2])/256, parseInt(m[3])/256]);
     sfig.throwException('Unknown color: ' + color);
   }
 
