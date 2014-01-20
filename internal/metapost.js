@@ -467,8 +467,9 @@ function isLeaf(block) {
     content = content.replace(/%/g, '\\%');
     content = content.replace(/#/g, '\\#');
 
-    // Quote these things outside math mode
+    // Quote these things only outside math mode
     content = mapNonMathMode(content, function(s) {
+      // Don't quote '&'; use '&amp;' instead.
       s = s.replace(/_/g, '\\_');
       s = s.replace(/{/g, '\\{');
       s = s.replace(/}/g, '\\}');
@@ -1088,13 +1089,12 @@ function isLeaf(block) {
     this.numPages++;
     activeBlocks.forEach(function(block) {
       self.verbatim('draw ' + block.pic + ';');
-    });
 
-    // Draw images
-    // Important: put externalfigure after all calls to draw.
-    // Otherwise, the Metapost messes up the positioning when there are rotations above it.
-    // I don't understand why.
-    activeBlocks.forEach(function(block) {
+      // Draw images
+      // TODO: the Metapost messes up the positioning when there are rotations above it.
+      // I don't understand why.
+      // This can be fixed by putting externalfigure after all calls to draw.
+      // But then the ordering of the elements is broken.
       var pic = block.pic;
       if (!(block instanceof sfig.Image)) return;
       var file = Path.resolve(block.href().get());
