@@ -10,7 +10,9 @@ out=$1
 mkdir $out || exit 1
 
 # Link to this directory
-ln -sf $PWD $out/sfig || exit 1
+abspath () { case "$1" in /*)printf "%s\n" "$1";; *)printf "%s\n" "$PWD/$1";; esac; }
+real=`abspath $(dirname $0)`
+ln -sf $real $out/sfig || exit 1
 
 cat <<EOF > $out/index.html 
 <head>
