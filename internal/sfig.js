@@ -1562,10 +1562,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     function fontsLoaded() {
       Text.fontsLoaded = true;
-      var fudge = 1; // Firefox needs +1
+      // TODO: figure out how to get the true size that we need for the div.
+      // the offsetWidth,offsetHeight are too small in Chrome for some examples.
+      var xfudge = 1; // Chrome needs +8 for "$a$ <b>1 2</b>" or else things get cut off, but can't apply this universally
+      var yfudge = 1; // Firefox needs +1
       // BUG: Chrome doesn't render $G$ properly
-      elem.setAttribute('width', div.offsetWidth + fudge);
-      elem.setAttribute('height', div.offsetHeight + fudge);
+      //sfig.L('SIZE ' + div.offsetWidth + ' ' + div.offsetHeight);
+      elem.setAttribute('width', div.offsetWidth + xfudge);
+      elem.setAttribute('height', div.offsetHeight + yfudge);
       self.elem = elem;
       callback();
     }
