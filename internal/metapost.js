@@ -74,7 +74,14 @@ function isLeaf(block) {
   MetapostExpr.ypair = function(y) { return MetapostExpr.xypair(0, y); }
   MetapostExpr.rgbcolor = function(r, g, b) { return MetapostExpr.color([r/255.0, g/255.0, b/255.0]); }
   MetapostExpr.hexcolor = function(s) {
-    var m = s.match(/^#(..)(..)(..)$/);
+    var m = s.match(/^#(.)(.)(.)$/);
+    if (m) {
+      m[1] += '0';
+      m[2] += '0';
+      m[3] += '0';
+    } else {
+      m = s.match(/^#(..)(..)(..)$/);
+    }
     if (!m) sfig.throwException('Invalid hex color: ' + s);
     return MetapostExpr.color([parseInt(m[1], 16)/255.0, parseInt(m[2], 16)/255.0, parseInt(m[3], 16)/255.0]);
   }
@@ -201,6 +208,7 @@ function isLeaf(block) {
     blue: '#0000FF',
     green: '#008000',
 
+    darkred: '#8B0000',
     darkblue: '#0000A0',
     lightblue: '#ADD8E6',
     cyan: '#00FFFF',
@@ -487,6 +495,7 @@ function isLeaf(block) {
       content = content.replace(/<del>/g, '\\sout{');
       content = content.replace(/<ins>/g, '\\uline{');
       content = content.replace(/<font color="([^>]+)">/g, '\\textcolor{$1}{');
+      content = content.replace(/<span style="font-variant:small-caps">/, '\\textsc{');
       content = content.replace(/<\/[a-z]+>/g, '}');  // Closing tag
       if (oldContent == content) break;
     }

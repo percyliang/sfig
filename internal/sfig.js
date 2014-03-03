@@ -3449,6 +3449,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.bold = function(s) { return s.bold(); }
   sfig.italics = function(s) { return s.italics(); }
   sfig.tt = function(s) { return '<tt>' + s + '</tt>'; }
+  sfig.sc = function(x) { return '<span style="font-variant:small-caps">' + x + '</span>'; }
 
   // Note: this requires cross origin scripting
   // For Chrome, either of the following will do the trick:
