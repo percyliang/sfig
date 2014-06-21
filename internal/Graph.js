@@ -219,6 +219,17 @@
     }
   }
 
+  // Internal function
+  Graph.prototype.addValueLabel = function(i, x, y, target) {
+    //sfig.L('addValueLabel', i, x, y);
+    var yvalueFunc = this.yvalueFunc().get();
+    if (yvalueFunc == null) return;
+    var yvalue = yvalueFunc(i, x, y);
+    if (yvalue == null) return;
+    yvalue = sfig.transform(yvalue).pivot(0, 1).shift(target.xmiddle(), target.top().up(this.yvaluePadding()));
+    this.addChild(yvalue);
+  }
+
   Graph.prototype.xvalueToCoord = function(value) {
     return +this.xlength().getOrDie() * (value - this.xminValue().getOrDie()) / (this.xmaxValue().getOrDie() - this.xminValue().getOrDie());
   }
@@ -266,7 +277,8 @@
 
   // Marker
   sfig_.addProperty(Graph, 'marker', null, 'Function mapping trajectory to a marker object');
-  sfig_.addProperty(Graph, 'yvalueScale', null, 'Display y value above with this size');
+  sfig_.addProperty(Graph, 'yvalueFunc', null, 'Call this function on (trajectory index, x, y) and display result above marker.');
+  sfig_.addProperty(Graph, 'yvaluePadding', 3, 'Padding between the marker or bar and the value to be displayed');
 })();
 
 ////////////////////////////////////////////////////////////
@@ -313,6 +325,7 @@
           marker.shift(q[0], q[1]);
           marker.tooltip(p.x + ',' + p.y);
           self.addChild(marker);
+          self.addValueLabel(p.y, i, marker);
         }
         lastq = q;
       });
@@ -358,7 +371,6 @@
       var trajectory = this.trajectories[i];
 
       var group = 0;
-      // TODO: handle multiple trajectories
       trajectory.forEach(function(p) {
         var x = self.xvalueToCoord(p.x);
         // Corners
@@ -373,12 +385,7 @@
           var bar = sfig.polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
           bar.tooltip(p.x + ',' + p.y);
           self.addChild(bar);
-          var yvalueScale = self.yvalueScale().get();
-          if (yvalueScale != null) {
-            var str = text(p.y).scale(yvalueScale);
-            var yvalue = sfig.transform(str).pivot(0, 1).shift(bar.xmiddle(), bar.top().up(5));
-            self.addChild(yvalue);
-          }
+          self.addValueLabel(i, p.x, p.y, bar);
         }
         group++;
       });
