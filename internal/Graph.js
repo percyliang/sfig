@@ -71,14 +71,12 @@
       var length = this.length()[axis].getOrDie();
       var otherLength = this.length()[1-axis].getOrDie();
       var overshoot = this.overshoot()[axis].getOrDie();
-      var convert;
-      if (axis == 0)  // x-axis
-        convert = function(x, y) { return [x, y]; };
-      else // y-axis
-        convert = function(y, x) { return [x, y] };
 
       // Axis
-      this.addChild(line([0, 0], convert((length + overshoot) * (axis == 0 ? 1 : -sfig.downSign), 0)));
+      if (axis == 0)  // x-axis
+        this.addChild(line([0, 0], [length + overshoot, 0]));
+      else  // y-axis
+        this.addChild(line([0, 0], [0, -sfig.downSign * (length + overshoot)]));
 
       //// Ticks and tick labels
       var tickStyle = this.tickStyle()[axis].get();
@@ -112,18 +110,25 @@
       for (var i = this.tickIncludeAxis()[axis].get() ? 0 : 1; i < numTicks; i++) {
         var value = tickIncrValue * i + tickStartValue;
         if (!isFinite(value)) throw 'Bad value: '+value;
-        var coord = axis == 0 ? this.xvalueToCoord(value) : this.yvalueToCoord(value);
+        var coord = (axis == 0) ? this.xvalueToCoord(value) : this.yvalueToCoord(value);
         var displayValue = this.expValue()[axis].get() ? Math.exp(value) : value;
 
         // Draw the tick
         var tick = null;
         if (tickStyle == 'short') {
           // Ticks stick out of the graph a little bit
-          tick = sfig.line(convert(coord, 0), convert(coord, tickLength));
+          if (axis == 0)
+            tick = sfig.line([coord, 0], [coord, sfig.downSign * tickLength]);
+          else
+            tick = sfig.line([0, coord], [-tickLength, coord]);
         } else if (tickStyle == 'long') {
           // Ticks go all the way across the graph
-          if (value != minValue)  // Exclude if we are already are drawing the axis
-            tick = sfig.line(convert(coord, 0), convert(coord, (axis == 1 ? 1 : -1) * otherLength));
+          if (value != minValue) {  // Exclude if we are already are drawing the axis
+            if (axis == 0)
+              tick = sfig.line([coord, 0], [coord, -sfig.downSign * otherLength]);
+            else
+              tick = sfig.line([0, coord], [otherLength, coord]);
+          }
         }
         if (tick != null) {
           tick.color(tickColor);
@@ -164,11 +169,10 @@
         }
 
         if (tickLabel != null) {
-          var p = convert(coord, -tickLabelPadding);
           tickLabel = transform(tickLabel).scale(tickLabelScale);
-          if (axis == 0)
-            tickLabel.pivot(0, -1).shift(coord, tickLabelPadding);
-          else
+          if (axis == 0)  // x-axis
+            tickLabel.pivot(0, -1).shift(coord, sfig.downSign * tickLabelPadding);
+          else  // y-axis
             tickLabel.pivot(1, 0).shift(-tickLabelPadding, coord);
           this.addChild(tickLabel);
         }
@@ -179,9 +183,9 @@
         axisLabel = sfig.std(axisLabel);
         axisLabel.rotate(axisLabelRotate);
         this.axisLabelBlock = sfig.transform(axisLabel);
-        if (axis == 0)
+        if (axis == 0)  // x-axis
           this.axisLabelBlock.pivot(0, -1).shiftBy(length / 2, axisLabelPadding);
-        else
+        else  // y-axis
           this.axisLabelBlock.pivot(1, 0).shiftBy(-axisLabelPadding, -length / 2);
         this.addChild(this.axisLabelBlock);
       }
