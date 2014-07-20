@@ -259,9 +259,10 @@ function isLeaf(block) {
     return new MetapostExpr('numeric', 'ypart', [this]);
   }
 
-  MetapostExpr.text = function(str, useRawBounds, fontSize) {
+  MetapostExpr.text = function(str, useRawBounds, fontSize, strokeColor) {
     var h = useRawBounds ? '' : '; hackTextBounds';
-    var data = 'image(draw btex '+str+' etex'+h+') scaled ' + (fontSize / 11.0);
+    var s = strokeColor ? ' withcolor ' + sfig.MetapostExpr.ensureColor(strokeColor) : '';
+    var data = 'image(draw btex '+str+' etex' + s + h + ') scaled ' + (fontSize / 11.0);
     return MetapostExpr.picture(data);
   }
 
@@ -566,7 +567,7 @@ function isLeaf(block) {
 
     //sfig.L('TRANSFORMED CONTENT: ' + content);
 
-    var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie()));
+    var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie(), this.strokeColor().get()));
     this.pic = writer.store(pic.ydown(pic.realHeight()));
 
     if (autowrap && !this.bulleted().get()) {
