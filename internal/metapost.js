@@ -560,7 +560,7 @@ function isLeaf(block) {
     //L(strippedContent + ': ' + autowrap);
     if (autowrap) {
       var width = this.width().getOrDie() / 210;  // Hack: need to find right ratio
-      width /= this.fontSize().get() / 28;
+      width /= this.fontSize().get() / 32;
       //L(content + ': ' + this.width().get());
       content = '\\begin{minipage}{'+width+'in}\n' + content + '\n\\end{minipage}';
     }
