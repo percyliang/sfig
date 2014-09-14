@@ -200,6 +200,7 @@ function isLeaf(block) {
     red: '#FF0000',
     blue: '#0000FF',
     green: '#008000',
+    lightgreen: '#90EE90',
 
     darkblue: '#0000A0',
     lightblue: '#ADD8E6',
