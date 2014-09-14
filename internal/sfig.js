@@ -1562,10 +1562,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     function fontsLoaded() {
       Text.fontsLoaded = true;
-      var fudge = 1; // Firefox needs +1
+      // TODO: figure out how to get the true size that we need for the div.
+      // the offsetWidth,offsetHeight are too small in Chrome for some examples.
+      var xfudge = 1; // Chrome needs +8 for "$a$ <b>1 2</b>" or else things get cut off, but can't apply this universally
+      var yfudge = 1; // Firefox needs +1
       // BUG: Chrome doesn't render $G$ properly
-      elem.setAttribute('width', div.offsetWidth + fudge);
-      elem.setAttribute('height', div.offsetHeight + fudge);
+      //sfig.L('SIZE ' + div.offsetWidth + ' ' + div.offsetHeight);
+      elem.setAttribute('width', div.offsetWidth + xfudge);
+      elem.setAttribute('height', div.offsetHeight + yfudge);
       self.elem = elem;
       callback();
     }
@@ -3445,6 +3449,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.bold = function(s) { return s.bold(); }
   sfig.italics = function(s) { return s.italics(); }
   sfig.tt = function(s) { return '<tt>' + s + '</tt>'; }
+  sfig.sc = function(x) { return '<span style="font-variant:small-caps">' + x + '</span>'; }
 
   // Note: this requires cross origin scripting
   // For Chrome, either of the following will do the trick:
@@ -3514,7 +3519,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.parseUrlParamsFromLocation();
 
     // Make custom sfig fonts available.
-    if (Text.defaults.getProperty('font') == 'Noto Sans')
+    if (sfig.Text.defaults.getProperty('font').get() == 'Noto Sans')
       sfig_.includeStylesheet(sfig.getInternalDir() + '/../fonts/fonts.css');
 
     if (sfig.enableMath) {

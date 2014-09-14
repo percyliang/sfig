@@ -71,14 +71,12 @@
       var length = this.length()[axis].getOrDie();
       var otherLength = this.length()[1-axis].getOrDie();
       var overshoot = this.overshoot()[axis].getOrDie();
-      var convert;
-      if (axis == 0)  // x-axis
-        convert = function(x, y) { return [x, y]; };
-      else // y-axis
-        convert = function(y, x) { return [x, y] };
 
       // Axis
-      this.addChild(line([0, 0], convert((length + overshoot) * (axis == 0 ? 1 : -sfig.downSign), 0)));
+      if (axis == 0)  // x-axis
+        this.addChild(line([0, 0], [length + overshoot, 0]));
+      else  // y-axis
+        this.addChild(line([0, 0], [0, -sfig.downSign * (length + overshoot)]));
 
       //// Ticks and tick labels
       var tickStyle = this.tickStyle()[axis].get();
@@ -112,18 +110,25 @@
       for (var i = this.tickIncludeAxis()[axis].get() ? 0 : 1; i < numTicks; i++) {
         var value = tickIncrValue * i + tickStartValue;
         if (!isFinite(value)) throw 'Bad value: '+value;
-        var coord = axis == 0 ? this.xvalueToCoord(value) : this.yvalueToCoord(value);
+        var coord = (axis == 0) ? this.xvalueToCoord(value) : this.yvalueToCoord(value);
         var displayValue = this.expValue()[axis].get() ? Math.exp(value) : value;
 
         // Draw the tick
         var tick = null;
         if (tickStyle == 'short') {
           // Ticks stick out of the graph a little bit
-          tick = sfig.line(convert(coord, 0), convert(coord, tickLength));
+          if (axis == 0)
+            tick = sfig.line([coord, 0], [coord, sfig.downSign * tickLength]);
+          else
+            tick = sfig.line([0, coord], [-tickLength, coord]);
         } else if (tickStyle == 'long') {
           // Ticks go all the way across the graph
-          if (value != minValue)  // Exclude if we are already are drawing the axis
-            tick = sfig.line(convert(coord, 0), convert(coord, (axis == 1 ? 1 : -1) * otherLength));
+          if (value != minValue) {  // Exclude if we are already are drawing the axis
+            if (axis == 0)
+              tick = sfig.line([coord, 0], [coord, -sfig.downSign * otherLength]);
+            else
+              tick = sfig.line([0, coord], [otherLength, coord]);
+          }
         }
         if (tick != null) {
           tick.color(tickColor);
@@ -164,11 +169,10 @@
         }
 
         if (tickLabel != null) {
-          var p = convert(coord, -tickLabelPadding);
           tickLabel = transform(tickLabel).scale(tickLabelScale);
-          if (axis == 0)
-            tickLabel.pivot(0, -1).shift(coord, tickLabelPadding);
-          else
+          if (axis == 0)  // x-axis
+            tickLabel.pivot(0, -1).shift(coord, sfig.downSign * tickLabelPadding);
+          else  // y-axis
             tickLabel.pivot(1, 0).shift(-tickLabelPadding, coord);
           this.addChild(tickLabel);
         }
@@ -179,9 +183,9 @@
         axisLabel = sfig.std(axisLabel);
         axisLabel.rotate(axisLabelRotate);
         this.axisLabelBlock = sfig.transform(axisLabel);
-        if (axis == 0)
+        if (axis == 0)  // x-axis
           this.axisLabelBlock.pivot(0, -1).shiftBy(length / 2, axisLabelPadding);
-        else
+        else  // y-axis
           this.axisLabelBlock.pivot(1, 0).shiftBy(-axisLabelPadding, -length / 2);
         this.addChild(this.axisLabelBlock);
       }
@@ -213,6 +217,17 @@
       var legendBlock = sfig.transform(legendBlock).pivot(-1, 1); // Line it up with rest of Graph (lower-left is origin)
       this.addChild(legendBlock);
     }
+  }
+
+  // Internal function
+  Graph.prototype.addValueLabel = function(i, x, y, target) {
+    //sfig.L('addValueLabel', i, x, y);
+    var yvalueFunc = this.yvalueFunc().get();
+    if (yvalueFunc == null) return;
+    var yvalue = yvalueFunc(i, x, y);
+    if (yvalue == null) return;
+    yvalue = sfig.transform(yvalue).pivot(0, 1).shift(target.xmiddle(), target.top().up(this.yvaluePadding()));
+    this.addChild(yvalue);
   }
 
   Graph.prototype.xvalueToCoord = function(value) {
@@ -262,8 +277,8 @@
 
   // Marker
   sfig_.addProperty(Graph, 'marker', null, 'Function mapping trajectory to a marker object');
-  sfig_.addProperty(Graph, 'markerSize', null, 'How big should the marker be?');
-  sfig_.addProperty(Graph, 'yvalueScale', null, 'Display y value above with this size');
+  sfig_.addProperty(Graph, 'yvalueFunc', null, 'Call this function on (trajectory index, x, y) and display result above marker.');
+  sfig_.addProperty(Graph, 'yvaluePadding', 3, 'Padding between the marker or bar and the value to be displayed');
 })();
 
 ////////////////////////////////////////////////////////////
@@ -310,6 +325,7 @@
           marker.shift(q[0], q[1]);
           marker.tooltip(p.x + ',' + p.y);
           self.addChild(marker);
+          self.addValueLabel(p.y, i, marker);
         }
         lastq = q;
       });
@@ -355,7 +371,6 @@
       var trajectory = this.trajectories[i];
 
       var group = 0;
-      // TODO: handle multiple trajectories
       trajectory.forEach(function(p) {
         var x = self.xvalueToCoord(p.x);
         // Corners
@@ -370,12 +385,7 @@
           var bar = sfig.polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
           bar.tooltip(p.x + ',' + p.y);
           self.addChild(bar);
-          var yvalueScale = self.yvalueScale().get();
-          if (yvalueScale != null) {
-            var str = text(p.y).scale(yvalueScale);
-            var yvalue = sfig.transform(str).pivot(0, 1).shift(bar.xmiddle(), bar.top().up(5));
-            self.addChild(yvalue);
-          }
+          self.addValueLabel(i, p.x, p.y, bar);
         }
         group++;
       });

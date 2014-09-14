@@ -74,7 +74,14 @@ function isLeaf(block) {
   MetapostExpr.ypair = function(y) { return MetapostExpr.xypair(0, y); }
   MetapostExpr.rgbcolor = function(r, g, b) { return MetapostExpr.color([r/255.0, g/255.0, b/255.0]); }
   MetapostExpr.hexcolor = function(s) {
-    var m = s.match(/^#(..)(..)(..)$/);
+    var m = s.match(/^#(.)(.)(.)$/);
+    if (m) {
+      m[1] += '0';
+      m[2] += '0';
+      m[3] += '0';
+    } else {
+      m = s.match(/^#(..)(..)(..)$/);
+    }
     if (!m) sfig.throwException('Invalid hex color: ' + s);
     return MetapostExpr.color([parseInt(m[1], 16)/255.0, parseInt(m[2], 16)/255.0, parseInt(m[3], 16)/255.0]);
   }
@@ -125,8 +132,8 @@ function isLeaf(block) {
 
   // Return distance between points this and p
   MetapostExpr.prototype.distance = function(p) {
-    var xdiff = this.x().sub(p.x());
-    var ydiff = this.y().sub(p.y());
+    var xdiff = this.x().sub(p.x()).abs();
+    var ydiff = this.y().sub(p.y()).abs();
     if (xdiff.isZero()) return ydiff;
     if (ydiff.isZero()) return xdiff;
     return new MetapostExpr('numeric', '++', [xdiff, ydiff]);
@@ -202,6 +209,7 @@ function isLeaf(block) {
     green: '#008000',
     lightgreen: '#90EE90',
 
+    darkred: '#8B0000',
     darkblue: '#0000A0',
     lightblue: '#ADD8E6',
     cyan: '#00FFFF',
@@ -225,7 +233,7 @@ function isLeaf(block) {
     if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
     var m = color.match(/^rgb\((.+),(.+),(.+)\)$/);
     if (m)
-      return MetapostExpr.color([parseInt(m[1]), parseInt(m[2]), parseInt(m[3])]);
+      return MetapostExpr.color([parseInt(m[1])/256, parseInt(m[2])/256, parseInt(m[3])/256]);
     sfig.throwException('Unknown color: ' + color);
   }
 
@@ -252,9 +260,10 @@ function isLeaf(block) {
     return new MetapostExpr('numeric', 'ypart', [this]);
   }
 
-  MetapostExpr.text = function(str, useRawBounds, fontSize) {
+  MetapostExpr.text = function(str, useRawBounds, fontSize, strokeColor) {
     var h = useRawBounds ? '' : '; hackTextBounds';
-    var data = 'image(draw btex '+str+' etex'+h+') scaled ' + (fontSize / 11.0);
+    var s = strokeColor ? ' withcolor ' + sfig.MetapostExpr.ensureColor(strokeColor) : '';
+    var data = 'image(draw btex '+str+' etex' + s + h + ') scaled ' + (fontSize / 11.0);
     return MetapostExpr.picture(data);
   }
 
@@ -468,9 +477,9 @@ function isLeaf(block) {
     content = content.replace(/%/g, '\\%');
     content = content.replace(/#/g, '\\#');
 
-    // Quote these things outside math mode
+    // Quote these things only outside math mode
     content = mapNonMathMode(content, function(s) {
-      s = s.replace(/&/g, '\\&');
+      // Don't quote '&'; use '&amp;' instead.
       s = s.replace(/_/g, '\\_');
       s = s.replace(/{/g, '\\{');
       s = s.replace(/}/g, '\\}');
@@ -488,6 +497,7 @@ function isLeaf(block) {
       content = content.replace(/<del>/g, '\\sout{');
       content = content.replace(/<ins>/g, '\\uline{');
       content = content.replace(/<font color="([^>]+)">/g, '\\textcolor{$1}{');
+      content = content.replace(/<span style="font-variant:small-caps">/, '\\textsc{');
       content = content.replace(/<\/[a-z]+>/g, '}');  // Closing tag
       if (oldContent == content) break;
     }
@@ -551,14 +561,14 @@ function isLeaf(block) {
     //L(strippedContent + ': ' + autowrap);
     if (autowrap) {
       var width = this.width().getOrDie() / 210;  // Hack: need to find right ratio
-      width /= this.fontSize().get() / 28;
+      width /= this.fontSize().get() / 32;
       //L(content + ': ' + this.width().get());
       content = '\\begin{minipage}{'+width+'in}\n' + content + '\n\\end{minipage}';
     }
 
     //sfig.L('TRANSFORMED CONTENT: ' + content);
 
-    var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie()));
+    var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie(), this.strokeColor().get()));
     this.pic = writer.store(pic.ydown(pic.realHeight()));
 
     if (autowrap && !this.bulleted().get()) {
@@ -647,6 +657,36 @@ function isLeaf(block) {
       else  // No arrow
         this.pic = writer.store(sfig.MetapostExpr.draw(path, getDrawOptions(this)));
 
+      // For some reason, thick lines don't end up with the right bounding box, so have to fix it up.
+      // HACK: only do this when lines are axis-aligned and absolute positions are given
+      var x1 = this.line.x1().get();
+      var y1 = this.line.y1().get();
+      var x2 = this.line.x2().get();
+      var y2 = this.line.y2().get();
+      var strokeWidth = this.strokeWidth().getOrElse(sfig.defaultStrokeWidth);
+      if (x1 != null && y1 != null && x2 != null && y2 != null) {
+        var widthFixup = (d1 || d2) ? 0.175 * strokeWidth : 0;  // Only fix if arrow
+        var lengthFixup = 0.5 * strokeWidth;
+        var lengthArrowFixup = (strokeWidth == 1) ? 0.5 : 1.22 * strokeWidth;
+
+        if (y1 == y2) {  // Horizontal
+          var std_d1 = d1, std_d2 = d2;
+          if (x1 > x2) { std_d1 = d2; std_d2 = d1; }
+          var left = std_d1 ? this.pic.left().sub(lengthArrowFixup) : this.pic.left().add(lengthFixup);
+          var right = std_d2 ? this.pic.right().add(lengthArrowFixup) : this.pic.right().sub(lengthFixup);
+          var top = this.pic.top().up(widthFixup);
+          var bottom = this.pic.bottom().down(widthFixup);
+          writer.setBounds(this.pic, sfig.MetapostExpr.rect(left, top, right, bottom));
+        } else if (x1 == x2) {  // Vertical
+          var std_d1 = d1, std_d2 = d2;
+          if ((y2 - y1) * sfig.downSign < 0) { std_d1 = d2; std_d2 = d1; }
+          var top = std_d1 ? this.pic.top().up(lengthArrowFixup) : this.pic.top().down(lengthFixup);
+          var bottom = std_d2 ? this.pic.bottom().down(lengthArrowFixup) : this.pic.bottom().up(lengthFixup);
+          var left = this.pic.left().sub(widthFixup);
+          var right = this.pic.right().add(widthFixup);
+          writer.setBounds(this.pic, sfig.MetapostExpr.rect(left, top, right, bottom));
+        }
+      }
       return;
     }
     
@@ -725,8 +765,10 @@ function isLeaf(block) {
         var dist = p1.distance(p2);
         dist = writer.storeIfComplex(dist);
         // How much an arrow is going to spill over
-        var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.5;  // Hack
+        // HACK
+        var extraLength = decoratedBlock.strokeWidth().getOrElse(sfig.defaultStrokeWidth) * 1.72;
 
+        // Scale back so the arrow fits within the allotted length
         if (d1) {
           var d1frac = sfig.MetapostExpr.numeric(extraLength).div(dist);
           newp1 = sfig.MetapostExpr.mediation(d1frac, p1, p2);
@@ -1058,13 +1100,12 @@ function isLeaf(block) {
     this.numPages++;
     activeBlocks.forEach(function(block) {
       self.verbatim('draw ' + block.pic + ';');
-    });
 
-    // Draw images
-    // Important: put externalfigure after all calls to draw.
-    // Otherwise, the Metapost messes up the positioning when there are rotations above it.
-    // I don't understand why.
-    activeBlocks.forEach(function(block) {
+      // Draw images
+      // TODO: the Metapost messes up the positioning when there are rotations above it.
+      // I don't understand why.
+      // This can be fixed by putting externalfigure after all calls to draw.
+      // But then the ordering of the elements is broken.
       var pic = block.pic;
       if (!(block instanceof sfig.Image)) return;
       var file = Path.resolve(block.href().get());
