@@ -19,7 +19,7 @@ if (typeof global != 'undefined') {
 // Default parameters which can be overridden.
 
 sfig.homePage = 'http://github.com/percyliang/sfig';
-sfig.version = '1.0';
+sfig.version = '1.1';
 sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
@@ -31,9 +31,6 @@ sfig.enableAnimations = true;  // Whether to allow animations.
 sfig.enableTiming = false;  // Enable to see how long it takes to render.
 sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 sfig.enableMouseWheel = true;  // Whether allow mouse wheel to scroll
-
-sfig.defaultPrintNumRowsPerPage = 3;
-sfig.defaultPrintNumColsPerPage = 2;
 
 // In SVG, down is increasing y (sfig.serverSide = false)
 // In Metapost, down is increasing y (sfig.serverSide = true).
@@ -430,17 +427,24 @@ sfig.down = function(x) { return x * sfig.downSign; };
     window.location.hash = sfig_.urlHash;
   }
 
-  // Toggle between regular mode and new mode.
-  // Return whether we changed the mode to newMode.
-  sfig_.toggleMode = function(newMode) {
+  // Set the display mode, reloading the page if necessary.
+  // Return whether we changed anything.
+  sfig_.setDisplayMode = function(newMode) {
     if (sfig_.urlParams.mode != newMode) {
       sfig_.urlParams.mode = newMode;
+      sfig_.serializeUrlParamsToLocation();
+      window.location.reload();
       return true;
-    } else {
-      sfig_.urlParams.mode = null;
-      return false;
     }
+    return false;
   }
+  sfig_.getDisplayMode = function() { return sfig_.urlParams.mode; }
+  sfig_.DISPLAYMODE_DEFAULT = null;
+  sfig_.DISPLAYMODE_FULLSCREEN = 'fullScreen';
+  sfig_.DISPLAYMODE_OUTLINE = 'outline';
+  sfig_.DISPLAYMODE_PRINT1PP = 'print1pp';
+  sfig_.DISPLAYMODE_PRINT6PP = 'print6pp';
+  sfig_.DISPLAYMODES_PRINT = [sfig_.DISPLAYMODE_PRINT1PP, sfig_.DISPLAYMODE_PRINT6PP];
 })();
 
 ////////////////////////////////////////////////////////////
@@ -2627,6 +2631,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
     this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
     this.body.setEnd(this);
+    this.border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
+    this.border.setEnd(this);
   };
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
 
@@ -2653,8 +2659,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     //       +               +   +
 
     // Add border
-    var border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
-    this.addChild(border);
+    this.addChild(this.border);
 
     // Combine title and body
     var framedTitleBlock = _;
@@ -2777,12 +2782,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
       // Add notes and help
       var items = [];
       var notes = slide.notes().get();
+      if (slide.rightHeader().exists())
+        items.push(slide.rightHeader().get());
       if (notes)
         items.push(sfig.explain('Notes', notes, {pivot: [1, -1], borderWidth: 1}));
       if (!sfig.serverSide && slide.showHelp().get())
         items.push(sfig.explain('Help', this.getHelpBlock(), {pivot: [1, -1], borderWidth: 1}));
-      if (slide.rightHeader().exists())
-        items.push(slide.rightHeader().get());
       if (items.length > 0)
         slide.rightHeader(sfig.table(items).xmargin(5));
     }
@@ -2942,43 +2947,26 @@ sfig.down = function(x) { return x * sfig.downSign; };
       });
     }
 
-    /*this.registerKey('Jump to a presentation', ['shift-g'], function(callback) {
-      var query = prompt('Go to which presentation (name)?');
-      if (query == null) return callback();
-      sfig_.goToPresentation(query, null, null, true);
-    });*/
-
-    this.registerKey('Mode: full screen', ['shift-f'], function(callback) {
-      sfig_.toggleMode('fullScreen');
-      sfig_.serializeUrlParamsToLocation();
-      window.location.reload();
+    this.registerKey('Set display mode: default', ['shift-d'], function(callback) {
+      sfig_.setDisplayMode(sfig_.DISPLAYMODE_DEFAULT);
     });
-    this.registerKey('Mode: outline', ['shift-o'], function(callback) {
-      sfig_.toggleMode('outline');
-      sfig_.serializeUrlParamsToLocation();
-      window.location.reload();
+    this.registerKey('Set display mode: full screen', ['shift-f'], function(callback) {
+      sfig_.setDisplayMode(sfig_.DISPLAYMODE_FULLSCREEN);
     });
-    this.registerKey('Mode: print (big)', ['p'], function(callback) {
-      if (sfig_.toggleMode('print')) {
-        sfig_.urlParams.numColsPerPage = 1;
-        sfig_.urlParams.numRowsPerPage = 1;
-      }
-      sfig_.serializeUrlParamsToLocation();
-      window.location.reload();
+    this.registerKey('Set display mode: outline', ['shift-o'], function(callback) {
+      sfig_.setDisplayMode(sfig_.DISPLAYMODE_OUTLINE);
     });
-    this.registerKey('Mode: print (small)', ['shift-p'], function(callback) {
-      if (sfig_.toggleMode('print')) {
-        sfig_.urlParams.numColsPerPage = 2;
-        sfig_.urlParams.numRowsPerPage = 3;
-      }
-      sfig_.serializeUrlParamsToLocation();
-      window.location.reload();
+    this.registerKey('Set display mode: print (1pp)', ['p'], function(callback) {
+      sfig_.setDisplayMode(sfig_.DISPLAYMODE_PRINT1PP);
+    });
+    this.registerKey('Set display mode: print (6pp)', ['shift-p'], function(callback) {
+      sfig_.setDisplayMode(sfig_.DISPLAYMODE_PRINT6PP);
     });
 
     this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {
       if (!self.readyForSlideShowKey()) return callback();
       sfig_.performOperation('renderAll', function(modifiedCallback) {
-        self.goThroughAllSlides(modifiedCallback);
+        self.renderAllSlides(modifiedCallback);
       }, callback);
     });
 
@@ -3050,7 +3038,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   Presentation.prototype.readyForSlideShowKey = function() {
-    if (sfig_.urlParams.mode == 'print' || sfig_.urlParams.mode == 'outline')
+    if (sfig_.getDisplayMode() != sfig_.DISPLAYMODE_DEFAULT &&
+        sfig_.getDisplayMode() != sfig_.DISPLAYMODE_FULLSCREEN)
       return false;
 
     // This function is sometimes called when rendering isn't completed yet, so just ignore.
@@ -3070,7 +3059,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
   }
 
-  Presentation.prototype.goThroughAllSlides = function(callback) {
+  Presentation.prototype.renderAllSlides = function(callback) {
     // Render all the slides
     var self = this;
     var i = 0;
@@ -3091,8 +3080,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Presentation.prototype.setSlideIndex = function(slideIndex, callback) {
     var self = this;
 
-    // Remove old SVG (if not printing)
-    if (sfig_.urlParams.mode != 'print' && self.currSlideIndex != null)
+    // Remove old SVG if not printing; otherwise, just append
+    if (sfig_.DISPLAYMODES_PRINT.indexOf(sfig_.getDisplayMode()) == -1 && self.currSlideIndex != null)
       self.container.removeChild(self.slides[self.currSlideIndex].state.svg);
 
     self.currSlideIndex = Math.min(slideIndex, self.slides.length-1);
@@ -3101,7 +3090,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (slide == null) sfig.throwException('Invalid slide index: '+self.currSlideIndex);
     self.container.appendChild(self.slides[self.currSlideIndex].state.svg);
 
-    if (sfig_.urlParams.mode == 'fullScreen') {
+    // Don't display border in full screen mode
+    if (sfig_.getDisplayMode() == sfig_.DISPLAYMODE_FULLSCREEN) {
       if (slide.borderWidth) slide.borderWidth(0);
     }
 
@@ -3121,18 +3111,17 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var height = slide.realHeight().getOrDie();
 
       var desiredWidth, desiredHeight;
-      if (sfig_.urlParams.mode == 'fullScreen') {  // Print to fit the screen
-        // Make this less than 1, otherwise Firefox will show scrollbars
+      if (sfig_.getDisplayMode() == sfig_.DISPLAYMODE_FULLSCREEN) {
+        // HACK: Make this less than 1, otherwise Firefox will show scrollbars
         var scale = 0.97;
         desiredWidth = screen.availWidth * scale;
         desiredHeight = screen.availHeight * scale;
-      } else if (sfig_.urlParams.mode == 'print') {  // Print to fit the paper
-        var numRowsPerPage = parseInt(sfig_.urlParams.numRowsPerPage) || sfig.defaultPrintNumRowsPerPage;
-        var numColsPerPage = parseInt(sfig_.urlParams.numColsPerPage) || sfig.defaultPrintNumColsPerPage;
-        var scale;
-        if (numColsPerPage == 1) scale = numRowsPerPage == 1 ? 1 : 0.7;
-        else if (numColsPerPage == 2) scale = 0.4;
-        else scale = 1;
+      } else if (sfig_.getDisplayMode() == sfig_.DISPLAYMODE_PRINT1PP) {
+        var scale = 1;
+        desiredWidth = width * scale;
+        desiredHeight = height * scale;
+      } else if (sfig_.getDisplayMode() == sfig_.DISPLAYMODE_PRINT6PP) {
+        var scale = 0.4;
         desiredWidth = width * scale;
         desiredHeight = height * scale;
       } else {  // Original size
@@ -3194,7 +3183,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
       if (this.slides[i].id().get() == slideId)
         return i;
     }
-    sfig.throwException('No slide with id '+slideId);
+    //sfig.throwException('No slide with id '+slideId);
+    return 0;
   }
 
   Presentation.prototype.setSlideIdAndLevel = function(slideId, level, callback) {
@@ -3216,8 +3206,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Presentation.prototype.updateUrlParams = function() {
     var self = this;
-    sfig_.urlParams.slideId = null;
-    sfig_.urlParams.slideIndex = self.currSlideIndex;
+    var slide = this.slides[this.currSlideIndex];
+    if (slide.id().exists()) {
+      sfig_.urlParams.slideId = slide.id().get();
+      sfig_.urlParams.slideIndex = null;
+    } else {
+      sfig_.urlParams.slideId = null;
+      sfig_.urlParams.slideIndex = self.currSlideIndex;
+    }
     sfig_.urlParams.level = self.currLevel;
     sfig_.serializeUrlParamsToLocation();
   }
@@ -3266,12 +3262,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (!sfig_.initialized) sfig.throwException('Must call sfig.initialize() first');
 
     sfig_.performOperation('Presentation.run', function(modifiedCallback) {
-      var mode = sfig_.urlParams.mode;
-      if (mode == 'print')
+      var mode = sfig_.getDisplayMode();
+      if (sfig_.DISPLAYMODES_PRINT.indexOf(mode) != -1)
         self.displayPrinterFriendly(null, modifiedCallback);
-      else if (mode == 'outline')
+      else if (mode == sfig_.DISPLAYMODE_OUTLINE)
         self.displayOutline(null, modifiedCallback);
-      else if (mode == 'fullScreen' || !mode)
+      else if (mode == sfig_.DISPLAYMODE_FULLSCREEN || mode == sfig_.DISPLAYMODE_DEFAULT)
         self.displaySlideShow(null, modifiedCallback);
       else
         sfig.throwException('Invalid mode: '+mode);
@@ -3351,12 +3347,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var self = this;
 
     // Body
-    if (container == null) container = document.body;
+    if (container == null)
+      container = document.body;
     this.container = container;
+    //container.style.verticalAlign = 'top';  // Doesn't work
 
-    var numRowsPerPage = sfig_.urlParams.numRowsPerPage || sfig.defaultPrintNumRowsPerPage;
-    var numColsPerPage = sfig_.urlParams.numColsPerPage || sfig.defaultPrintNumColsPerPage;
-    var numSlidesPerPage = numRowsPerPage * numColsPerPage;
     var i = 0;
     function process() {
       //console.log('Printing slide '+i+'/'+self.slides.length);
@@ -3366,16 +3361,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       }
       self.setSlideIndexAndLevel(i, sfig_.maxLevel, function() {
         i++;
-        // Put a break
-        if (i < self.slides.length) {
-          if (i % numSlidesPerPage == 0) {
-            self.container.appendChild(pageBreak());
-          } else if (i % numColsPerPage == 0) {
-            self.container.appendChild(interSlidePadding());
-          } else {
-            self.container.appendChild(document.createTextNode(' '));
-          }
-        }
+        //self.container.appendChild(document.createTextNode(' '));
         process();
       });
     }
@@ -3543,7 +3529,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Firefox:
     //   - normal: works great, except when we print from this, the text is completely mis-aligned.
     //   - jax=SVG: only needed for printing.
-    if (window.chrome || sfig_.urlParams.mode == 'print') buf += '  jax: ["input/TeX", "output/SVG"],';
+    if (window.chrome || sfig_.DISPLAYMODES_PRINT.indexOf(sfig_.getDisplayMode()) != -1)
+      buf += '  jax: ["input/TeX", "output/SVG"],';
     buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
     buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
     buf += '  TeX: { Macros: {';

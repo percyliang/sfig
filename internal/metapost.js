@@ -442,7 +442,7 @@ function isLeaf(block) {
 
   var makeLatexFriendly = function(content) {
     if (!content) return content;
-    if (content == _) return content;
+    if (content == sfig._) return content;
     if (content instanceof Array) return content.map(makeLatexFriendly);
 
     if (content == '&nbsp;') return '\\ %'; // Need to put a % or else metapost doesn't interpret "\\ " properly.
