@@ -3525,12 +3525,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // TODO: want to remove this condition and not use the SVG jax, but there are problems.
     // Chrome:
     //   - normal: due to a bug in WebKit, stuff doesn't render properly at all (SVG transforms aren't handled).
-    //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing.
+    //   - jax=SVG: math isn't colored properly and can't highlight text, but it's better than nothing [use this]
     // Firefox:
     //   - normal: works great, except when we print from this, the text is completely mis-aligned.
-    //   - jax=SVG: only needed for printing.
-    if (window.chrome || sfig_.DISPLAYMODES_PRINT.indexOf(sfig_.getDisplayMode()) != -1)
-      buf += '  jax: ["input/TeX", "output/SVG"],';
+    //   - jax=SVG: only needed for printing [use this]
+    //if (window.chrome || sfig_.DISPLAYMODES_PRINT.indexOf(sfig_.getDisplayMode()) != -1)
+    buf += '  jax: ["input/TeX", "output/SVG"],';
     buf += '  extensions: ["tex2jax.js", "TeX/AMSmath.js", "TeX/AMSsymbols.js"],';
     buf += '  tex2jax: {inlineMath: [["$", "$"]]},';
     buf += '  TeX: { Macros: {';
