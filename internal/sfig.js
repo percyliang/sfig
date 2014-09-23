@@ -3586,6 +3586,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // Call this function to include another file
   sfig.includeFileFromArgs = function() {
     if (sfig.serverSide) {
+      // This branch is not really used
       var path = process.argv[2];
       if (!path) {
         console.log('Missing Javascript file to include');
@@ -3597,7 +3598,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     } else {
       var path = sfig_.urlParams.include;
       if (!path) {
-        console.log('Missing Javascript file to include (using #include=...)');
+        alert('Missing Javascript file to include.  To fix, append #include=<file> to the end of your URL.');
         return false;
       } else {
         sfig_.includeScript('./' + sfig_.urlParams.include);
