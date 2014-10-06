@@ -473,6 +473,8 @@ function isLeaf(block) {
     content = content.replace(/&gt;/g, '$>$');
     content = content.replace(/&le;/g, '$\\le$');
     content = content.replace(/&ge;/g, '$\\ge$');
+    content = content.replace(/&larr;/g, '$\\leftarrow$');
+    content = content.replace(/&rarr;/g, '$\\rightarrow$');
 
     content = content.replace(/%/g, '\\%');
     content = content.replace(/#/g, '\\#');
