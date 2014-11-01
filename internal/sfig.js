@@ -3065,11 +3065,15 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var i = 0;
     var saveSlideIndex = self.currSlideIndex;
     var saveLevel = self.currLevel;
+    var progressBox = document.createElement('div');
+    document.body.appendChild(progressBox);
     function process() {
       console.log('Rendering slide '+i+'/'+self.slides.length);
+      progressBox.innerHTML = 'Rendering slide '+i+'/'+self.slides.length;
       if (i == self.slides.length) {
         self.setSlideIndexAndLevel(saveSlideIndex, saveLevel, callback);  // Go to beginning
         self.updateUrlParams();
+        document.body.removeChild(progressBox);
         return;
       }
       self.setSlideIndex(i++, process);
