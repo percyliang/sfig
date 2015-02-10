@@ -3515,7 +3515,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (sfig.enableMath) {
       sfig_.initMathJax(
         sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default',
-        'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default'
+        'http://cdn.mathjax.org/mathjax/2.4-latest/MathJax.js?config=default'
       );
     }
 
