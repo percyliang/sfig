@@ -291,6 +291,7 @@
 
   sfig_.addProperty(LineGraph, 'markerPeriod', 2, 'Number of points between successive markers');
   sfig_.addProperty(LineGraph, 'lineWidth', 2, 'Width of lines');
+  sfig_.addProperty(LineGraph, 'lineDasharrays', null, 'List of list of dash lengths');
 
   LineGraph.prototype.createDataChildren = function() {
     var self = this;
@@ -299,6 +300,7 @@
     var lineWidth = this.lineWidth().get();
     var trajectoryNames = this.trajectoryNames().get() || [];
     var trajectoryColors = this.trajectoryColors().get() || [];
+    var lineDasharrays = this.lineDasharrays().get() || [];
 
     for (var i = 0; i <= this.trajectories.length; i++) {
       // Add property changers
@@ -316,6 +318,8 @@
           if (trajectoryNames[i]) segment.tooltip(trajectoryNames[i]);
           segment.color(trajectoryColors[i] || 'black');
           segment.strokeWidth(lineWidth);
+          if (lineDasharrays[i])
+            segment.strokeDasharray(lineDasharrays[i]);
           self.addChild(segment);
         }
 
