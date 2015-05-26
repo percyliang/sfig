@@ -1111,7 +1111,7 @@ function isLeaf(block) {
       var pic = block.pic;
       if (!(block instanceof sfig.Image)) return;
       var file = Path.resolve(block.href().get());
-      if (!Path.existsSync(file))
+      if (!fs.existsSync(file))
         sfig.throwException('File does not exist: ' + file);
       self.verbatim([
         'externalfigure',
@@ -1125,7 +1125,7 @@ function isLeaf(block) {
 
   // outPath: Metapost file
   function createMetapost(slide, outPath, opts) {
-    var oldContents = Path.existsSync(outPath) ? fs.readFileSync(outPath) : '';
+    var oldContents = fs.existsSync(outPath) ? fs.readFileSync(outPath) : '';
 
     // Create the Metapost file
     var writer = new MetapostWriter();
@@ -1187,7 +1187,7 @@ function isLeaf(block) {
     var newContents = fs.readFileSync(outPath);
 
     // Check to see if the Metapost file changed.
-    if (oldContents.toString() != newContents.toString() || !Path.existsSync(outPath.replace(/\.mp$/, '.pdf'))) {
+    if (oldContents.toString() != newContents.toString() || !fs.existsSync(outPath.replace(/\.mp$/, '.pdf'))) {
       var textContents = []
       function getTextBlocks(block) {
         if (block instanceof sfig.Text)
@@ -1271,7 +1271,7 @@ function isLeaf(block) {
     function computeImageSizes(block) {
       if (block instanceof sfig.Image) {
         var path = block.href().getOrDie();
-        if (!seenPaths[path] && !Path.existsSync(path + '.info')) {
+        if (!seenPaths[path] && !fs.existsSync(path + '.info')) {
           seenPaths[path] = true;
           sfig_.queue.system(__dirname + '/../bin/compute-image-sizes.rb ' + path);
         }
@@ -1287,7 +1287,7 @@ function isLeaf(block) {
         var slide = self.slides[slideIndex];
         var id = slide.id().getOrElse(slideIndex);
         var slidePrefix = slidesPath + '/' + id;
-        if (!opts.lazy || !Path.existsSync(slidePrefix + '.pdf')) {
+        if (!opts.lazy || !fs.existsSync(slidePrefix + '.pdf')) {
           sfig.L('Slide ' + slideIndex + '/' + self.slides.length + ': ' + id + (slide.title ? ' [' + slide.title().get() + ']' : ''));
           createMetapost(slide, slidePrefix + '.mp', opts);
         }
