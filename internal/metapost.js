@@ -977,7 +977,7 @@ function isLeaf(block) {
 })();
 
 (function() {
-  function MetapostWriter(opts) {
+  function MetapostWriter() {
     this.output = [];  // Lines to output
 
     var font = sfig.Text.defaults.getProperty('font').getOrDie();
@@ -1128,7 +1128,7 @@ function isLeaf(block) {
     var oldContents = fs.existsSync(outPath) ? fs.readFileSync(outPath) : '';
 
     // Create the Metapost file
-    var writer = new MetapostWriter(opts);
+    var writer = new MetapostWriter();
     slide.drawPicture(slide.state, writer);
 
     // Compute |maxLevel|.
