@@ -1,4 +1,4 @@
-// Create PDF file using Metapost (bsaed on rfig).
+// Create PDF file using Metapost (based on rfig).
 // This script works with node.js on the server side, not in the browser.
 //
 // Comments:
@@ -606,9 +606,9 @@ function isLeaf(block) {
     var strokeDasharray = block.strokeDasharray().get();
     if (strokeDasharray != null) {
       if (strokeDasharray[0] > strokeDasharray[1])
-        opts.push('dashed evenly');
+        opts.push('dashed evenly scaled ' + strokeDasharray[0]);
       else
-        opts.push('dashed withdots');
+        opts.push('dashed withdots scaled ' + strokeDasharray[0]);
     }
     return opts;
   }
@@ -977,7 +977,7 @@ function isLeaf(block) {
 })();
 
 (function() {
-  function MetapostWriter() {
+  function MetapostWriter(opts) {
     this.output = [];  // Lines to output
 
     var font = sfig.Text.defaults.getProperty('font').getOrDie();
@@ -1013,7 +1013,7 @@ function isLeaf(block) {
     var lines = [];
     for (var name in sfig_.latexMacros) {
       var arityBody = sfig_.latexMacros[name];
-      // Foce the command to override previous commands
+      // Force the command to override previous commands
       lines.push('\\providecommand{\\'+name+'}{}');
       lines.push('\\renewcommand{\\'+name+'}['+arityBody[0]+']{'+arityBody[1]+'}');
     }
@@ -1128,7 +1128,7 @@ function isLeaf(block) {
     var oldContents = fs.existsSync(outPath) ? fs.readFileSync(outPath) : '';
 
     // Create the Metapost file
-    var writer = new MetapostWriter();
+    var writer = new MetapostWriter(opts);
     slide.drawPicture(slide.state, writer);
 
     // Compute |maxLevel|.
