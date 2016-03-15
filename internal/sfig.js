@@ -1013,7 +1013,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Rotate back
     //var result = sfig_.rotateDegrees([dx, dy], rotate);
     //dx = result[0], dy = result[1];
-    
+
     return [this.left().get() + mx + dx, this.top().get() + my + dy];
   }
 
@@ -1404,7 +1404,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
         i++;
       }
 
-      if (i == blocks.length) { callback(); return; }
+      if (i == blocks.length) {
+        callback();
+        return;
+      }
       var block = blocks[i];
       if (stage == 0) {  // First render...
         stage = 1;
@@ -1811,6 +1814,24 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var elem = sfig_.newSvgElem('foreignObject');
       elem.setAttribute('width', this.width().getOrDie());
       elem.setAttribute('height', this.height().getOrDie());
+      elem.appendChild(div);
+      this.elem = elem;
+      callback();
+    } else if (href.substr(-4) == '.mp4') {
+      // This doesn't show up in Chrome properly, but works in Firefox.
+      var div = sfig_.newElem('video');
+      div.setAttribute('controls', 'true');
+      div.setAttribute('width', this.width().getOrElse('100%'));
+      div.setAttribute('height', this.height().getOrElse('100%'));
+
+      var source = sfig_.newElem('source');
+      source.setAttribute('src', href);
+      source.setAttribute('type', 'video/mp4');
+      div.appendChild(source);
+
+      var elem = sfig_.newSvgElem('foreignObject');
+      elem.setAttribute('width', this.width().getOrElse('100%'));
+      elem.setAttribute('height', this.height().getOrElse('100%'));
       elem.appendChild(div);
       this.elem = elem;
       callback();
@@ -3515,13 +3536,13 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (sfig.enableMath) {
       sfig_.initMathJax(
         sfig.getInternalDir() + '/../external/MathJax/MathJax.js?config=default',
-        'http://cdn.mathjax.org/mathjax/2.4-latest/MathJax.js?config=default'
+        'https://cdn.mathjax.org/mathjax/2.4-latest/MathJax.js?config=default'
       );
     }
 
     sfig_.initialized = true;
   }
-  
+
   sfig_.initMathJax = function(scriptLocation, fallbackScriptLocation) {
     var script = sfig_.includeScript(scriptLocation);
     var buf = '';

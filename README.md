@@ -7,6 +7,8 @@ To get an overview of the functionality and try sfig out interactively, point
 your web browser to:
 
     http://cs.stanford.edu/~pliang/sfig/examples/tutorial.html
+    
+The list of all classes and methods can be referenced from the [Wiki](https://github.com/percyliang/sfig/wiki).
 
 After you've downloaded sfig, create a presentation by typing:
 

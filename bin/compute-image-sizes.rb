@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-require File.dirname($0) + '/image_size'
+require File.dirname(File.absolute_path($0)) + '/image_size'
 require 'json'
 
 if ARGV.size == 0
