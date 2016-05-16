@@ -7,7 +7,7 @@ fi
 
 out=$1
 
-mkdir $out || exit 1
+mkdir -p $out || exit 1
 
 # Link to this directory
 abspath () { case "$1" in /*)printf "%s\n" "$1";; *)printf "%s\n" "$PWD/$1";; esac; }

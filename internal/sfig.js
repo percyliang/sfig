@@ -1553,6 +1553,19 @@ sfig.down = function(x) { return x * sfig.downSign; };
     div.style.fontFamily = this.font().getOrDie();
     div.style.fontSize = this.fontSize().getOrDie();
     var content = this.content().getOrDie();
+
+    // Fix up the string
+    function fix(x) {
+      if (x == null) return x;
+      // Backslash required for metapost in math mode (e.g., '$a\\_b$'), but not on the web, so remove it.
+      x = x.replace(/\\_/, '_');
+      return x;
+    }
+    if (sfig.isString(content))
+      content = fix(content);
+    else
+      content = content.map(fix);
+
     if (this.bulleted().get()) {
       if (sfig.isString(content)) content = [null, content];
       content = sfig_.removeIgnoreObject(content);
