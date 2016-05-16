@@ -1149,6 +1149,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     // Compute transformation from scratch
     if (ctm == null) {
+      // Fix for Chrome 48 removing getTransformToElement
+      // https://github.com/cpettitt/dagre-d3/issues/202
+      SVGElement.prototype.getTransformToElement = SVGElement.prototype.getTransformToElement || function(elem) {
+        return elem.getScreenCTM().inverse().multiply(this.getScreenCTM());
+      };
+
       ctm = this.elem.getTransformToElement(state.svg);
       //sfig.L('compute transform from scratch', transforms.join(' '), S(ctm));
     }
