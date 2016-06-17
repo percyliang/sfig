@@ -3468,7 +3468,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // Some default ones
   var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
 
-  sfig.colors = ['red', 'blue', 'green', 'purple', 'brown', 'darkblue', 'orange', 'black', 'white'];
+  sfig.colors = ['red', 'blue', 'green', 'purple', 'brown', 'darkred', 'darkblue', 'orange', 'black', 'gray', 'white'];
   sfig.colors.forEach(function(color) {
     sfig.latexMacro(color, 1, '{\\'+colorCmd+'{'+color+'}{#1}}');
     sfig[color] = function(x) { return x.fontcolor(color); };
