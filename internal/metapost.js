@@ -73,18 +73,6 @@ function isLeaf(block) {
   MetapostExpr.xpair = function(x) { return MetapostExpr.xypair(x, 0); }
   MetapostExpr.ypair = function(y) { return MetapostExpr.xypair(0, y); }
   MetapostExpr.rgbcolor = function(r, g, b) { return MetapostExpr.color([r/255.0, g/255.0, b/255.0]); }
-  MetapostExpr.hexcolor = function(s) {
-    var m = s.match(/^#(.)(.)(.)$/);
-    if (m) {
-      m[1] += '0';
-      m[2] += '0';
-      m[3] += '0';
-    } else {
-      m = s.match(/^#(..)(..)(..)$/);
-    }
-    if (!m) sfig.throwException('Invalid hex color: ' + s);
-    return MetapostExpr.color([parseInt(m[1], 16)/255.0, parseInt(m[2], 16)/255.0, parseInt(m[3], 16)/255.0]);
-  }
   MetapostExpr.zero = MetapostExpr.numeric(0);
   MetapostExpr.origin = MetapostExpr.xypair(0, 0);
   MetapostExpr.nullpicture = MetapostExpr.picture('nullpicture');
@@ -195,46 +183,11 @@ function isLeaf(block) {
   MetapostExpr.prototype.realWidth = function() { return new MetapostExpr('numeric', 'W', [this]); }
   MetapostExpr.prototype.realHeight = function() { return new MetapostExpr('numeric', 'H', [this]); }
 
-  // http://www.w3schools.com/tags/ref_color_tryit.asp
-  MetapostExpr.colorMap = {
-    white: '#FFFFFF',
-    black: '#000000',
-    silver: '#C0C0C0',
-    gray: '#808080',
-    lightgray: '#D3D3D3',
-    darkgray: '#A9A9A9',
-
-    red: '#FF0000',
-    blue: '#0000FF',
-    green: '#008000',
-    lightgreen: '#90EE90',
-
-    darkred: '#8B0000',
-    darkblue: '#0000A0',
-    lightblue: '#ADD8E6',
-    cyan: '#00FFFF',
-    orange: '#FFA500',
-    purple: '#800080',
-    brown: '#A52A2A',
-    yellow: '#FFFF00',
-    maroon: '#800000',
-    lime: '#00FF00',
-    fuchsia: '#FF00FF',
-    olive: '#808000',
-    pink: '#FAAFBE',
-  };
-  // Replace with hexcolor
-  for (var color in MetapostExpr.colorMap) {
-    MetapostExpr.colorMap[color] = MetapostExpr.hexcolor(MetapostExpr.colorMap[color]);
-  }
+  // Return the canonical MetapostExpr corresponding to |color|.
   MetapostExpr.ensureColor = function(color) {
     if (color instanceof MetapostExpr) return color;
-    if (color in MetapostExpr.colorMap) return MetapostExpr.colorMap[color];
-    if (color.match(/^#/)) return MetapostExpr.hexcolor(color);
-    var m = color.match(/^rgb\((.+),(.+),(.+)\)$/);
-    if (m)
-      return MetapostExpr.color([parseInt(m[1])/256, parseInt(m[2])/256, parseInt(m[3])/256]);
-    sfig.throwException('Unknown color: ' + color);
+    var rgb = sfig._getRGB(color);
+    return MetapostExpr.rgbcolor(rgb[0], rgb[1], rgb[2]);
   }
 
   // Transformations of picture
@@ -498,9 +451,19 @@ function isLeaf(block) {
       content = content.replace(/<tt>/g, '\\texttt{');
       content = content.replace(/<del>/g, '\\sout{');
       content = content.replace(/<ins>/g, '\\uline{');
-      content = content.replace(/<font color="([^>]+)">/g, '\\textcolor{$1}{');
       content = content.replace(/<span style="font-variant:small-caps">/, '\\textsc{');
-      content = content.replace(/<\/[a-z]+>/g, '}');  // Closing tag
+
+      // Replace colors with canonical versions
+      while (true) {
+        var m = content.match(/^(.*)<font color="([^>]+)">(.*)/);
+        if (!m) break;
+        m[2] = m[2].replace(/\\#/, '#');  // Undo escape of #
+        content = m[1] + '\\textcolor{' + sfig._canonicalColor(m[2]) + '}{' + m[3];
+      }
+
+      // Closing tag
+      content = content.replace(/<\/[a-z]+>/g, '}');
+
       if (oldContent == content) break;
     }
     return content;
@@ -525,23 +488,7 @@ function isLeaf(block) {
         content = '\\<'+content+'>';
     }
 
-    // In Metapost, autowrap = true means that we unfortunately have to take up
-    // the given width.
     var autowrap = this.autowrap().get();
-    if (autowrap == null) {
-      // Hack: try to guess what is the appropriate behavior here.
-      // For short strings, don't autowrap.  For long ones, do.
-      // You should generally specify autowrap().
-      autowrap = (strippedContent.length > 64 && !this.xparentPivot().exists());
-    }
-
-    /*var bulleted = this.bulleted().get() 
-    if (bulleted && sfig.isString(content) && !autowrap) {
-      // If we want a simple bullet, then just add the symbol without any fuss.
-      // This way, we can have short bullets that don't spill over.
-      bulleted = false;
-      content = '$\\bullet$ ' + content;
-    }*/
 
     // Put bullets.
     var bulleted = this.bulleted().get();
@@ -553,22 +500,27 @@ function isLeaf(block) {
       // We must use minipage for itemize, but also allows us to do wrapping.
       content = sfig_.removeIgnoreObject(content);
       content = bulletizeLatex(content);
+      if (autowrap == false)
+          sfig.throwException('Cannot have bulleted text and no autowrap, set the width instead if taking too much room');
       autowrap = true;  // Need autowrap to do bulletizing.
     }
+
+    if (autowrap == null) {
+      // Hack: try to guess what is the appropriate behavior here.
+      // For short strings, don't autowrap.  For long ones, do.
+      // You should generally specify autowrap().
+      autowrap = (strippedContent.length > 64 && !this.xparentPivot().exists());
+    }
+
     content = content.toString();
 
-    // In Metapost, wrapping means we have to put things in a minipage, which
+    // In Metapost, autowrap = true means we have to put things in a minipage, which
     // means (unlike SVG) it takes up the entire allotted width.
-    //var autowrap = this.bulleted().get() || this.autowrap().get();
-    //L(strippedContent + ': ' + autowrap);
     if (autowrap) {
       var width = this.width().getOrDie() / 210;  // Hack: need to find right ratio
       width /= this.fontSize().get() / 32;
-      //L(content + ': ' + this.width().get());
       content = '\\begin{minipage}{'+width+'in}\n' + content + '\n\\end{minipage}';
     }
-
-    //sfig.L('TRANSFORMED CONTENT: ' + content);
 
     var pic = writer.store(sfig.MetapostExpr.text(content, false, this.fontSize().getOrDie(), this.strokeColor().get()));
     this.pic = writer.store(pic.ydown(pic.realHeight()));
@@ -997,18 +949,13 @@ function isLeaf(block) {
     this.verbatimTex(
       '%&latex',
       '\\documentclass{article}',
-      '\\usepackage{color,amsmath,amssymb,ulem,verbatim,ifthen}',
+      '\\usepackage{color,xcolor,amsmath,amssymb,ulem,verbatim,ifthen}',
       '\\renewcommand{\\familydefault}{'+family+'}');
     
     // Allow us to include Chinese and Arabic
     this.verbatimTex('\\usepackage{CJKutf8,arabtex,utf8}');
     this.verbatimTex('\\setcode{utf8}');
 
-    this.verbatimTex.apply(this, Object.keys(sfig.MetapostExpr.colorMap).map(function(color) {
-      var rgb = sfig.MetapostExpr.colorMap[color];
-      return '\\definecolor{' + color + '}{rgb}{' + rgb.args.join(',') + '}';
-    }));
-    
     // Include macros
     var lines = [];
     for (var name in sfig_.latexMacros) {

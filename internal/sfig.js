@@ -3465,21 +3465,93 @@ sfig.down = function(x) { return x * sfig.downSign; };
     sfig_.latexMacros[name] = [arity, body];
   }
 
-  // Some default ones
-  var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
-
-  sfig.colors = ['red', 'blue', 'green', 'purple', 'brown', 'darkred', 'darkblue', 'orange', 'black', 'gray', 'white'];
-  sfig.colors.forEach(function(color) {
-    sfig.latexMacro(color, 1, '{\\'+colorCmd+'{'+color+'}{#1}}');
-    sfig[color] = function(x) { return x.fontcolor(color); };
-    sfig[color+'bold'] = function(x) { return x.fontcolor(color).bold(); };
-    sfig[color+'italics'] = function(x) { return x.fontcolor(color).italics(); };
-  });
-
+  // Basic text formatting
   sfig.bold = function(s) { return s.bold(); }
   sfig.italics = function(s) { return s.italics(); }
   sfig.tt = function(s) { return '<tt>' + s + '</tt>'; }
   sfig.sc = function(x) { return '<span style="font-variant:small-caps">' + x + '</span>'; }
+
+  // Colors logic: user will specify colors in HTML: 'red', 'rgb(255,0,0)', or '#ff0000'
+  // Need to convert this string into a canonical form:
+  // - serverSide = false (web): 'rgb(255,0,0)'
+  // - serverSide = true (Metapost): 'rgb:1,red;0,green;0,blue'
+  // http://www.w3schools.com/tags/ref_color_tryit.asp
+  // Some common colors.
+  sfig._colorMap = {
+    white: '#FFFFFF',
+    black: '#000000',
+    silver: '#C0C0C0',
+    gray: '#808080',
+    lightgray: '#D3D3D3',
+    darkgray: '#A9A9A9',
+
+    red: '#FF0000',
+    blue: '#0000FF',
+    green: '#008000',  // Note: don't use the super bright green #00FF00
+    lightgreen: '#90EE90',
+
+    darkred: '#8B0000',
+    darkblue: '#0000A0',
+    lightblue: '#ADD8E6',
+
+    cyan: '#00FFFF',
+    orange: '#FFA500',
+    purple: '#800080',
+    brown: '#A52A2A',
+    yellow: '#FFFF00',
+    maroon: '#800000',
+    lime: '#00FF00',
+    fuchsia: '#FF00FF',
+    olive: '#808000',
+    pink: '#FAAFBE',
+    foo: '#FF0000',
+  };
+  // Return the RGB value corresponding to a color.
+  sfig._getRGB = function(color) {
+    if (color in sfig._colorMap) color = sfig._colorMap[color];
+
+    // Match hex
+    var m = color.match(/^#(.)(.)(.)$/);
+    if (m) {
+      m[1] += '0';
+      m[2] += '0';
+      m[3] += '0';
+    } else {
+      m = color.match(/^#(..)(..)(..)$/);
+    }
+    if (m)
+      return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+
+    // Match decimal
+    var m = color.match(/^rgb\((.+),(.+),(.+)\)$/);
+    return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
+
+    if (!m) sfig.throwException('Invalid color: ' + s);
+  }
+  sfig._canonicalColor = function(color) {
+    var rgb = sfig._getRGB(color);
+    if (sfig.serverSide)
+      return 'rgb,1:red,' + (rgb[0]/255) + ';green,' + (rgb[1]/255) + ';blue,' + (rgb[2]/255);
+    else
+      return 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+  }
+  sfig.colorLatexMacro = function(name, color) {
+    var colorCmd = sfig.serverSide ? 'textcolor' : 'color';
+    var color = sfig._canonicalColor(color);
+    sfig.latexMacro(name, 1, '{\\'+colorCmd+'{'+color+'}{#1}}');
+  }
+
+  // Define convenient macros and functions for the common colors
+  function colorFunc(color) { return function(x) { return x.fontcolor(color); } }
+  function colorBoldFunc(color) { return function(x) { return x.fontcolor(color).bold(); } }
+  function colorItalicsFunc(color) { return function(x) { return x.fontcolor(color).italics(); } }
+  for (var name in sfig._colorMap) {
+    var color = sfig._colorMap[name];
+    sfig.colorLatexMacro(name, color);
+    sfig[name] = colorFunc(color);
+    sfig[name+'bold'] = colorBoldFunc(color);
+    sfig[name+'italics'] = colorItalicsFunc(color);
+  }
 
   // Note: this requires cross origin scripting
   // For Chrome, either of the following will do the trick:
