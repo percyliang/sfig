@@ -1558,7 +1558,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     function fix(x) {
       if (x == null) return x;
       // Backslash required for metapost in math mode (e.g., '$a\\_b$'), but not on the web, so remove it.
-      x = x.replace(/\\_/, '_');
+      if (sfig.isString(x))
+        x = x.replace(/\\_/, '_');
       return x;
     }
     if (sfig.isString(content))
