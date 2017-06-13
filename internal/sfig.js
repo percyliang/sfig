@@ -1564,6 +1564,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
     if (sfig.isString(content))
       content = fix(content);
+    else if (sfig.isNumber(content))
+      content = fix(content + '');
     else
       content = content.map(fix);
 
