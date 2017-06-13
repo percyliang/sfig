@@ -806,7 +806,7 @@ function isLeaf(block) {
   sfig.Image.prototype.drawMetapost = function(writer) {
     var E = sfig.MetapostExpr.ensureNumeric;
     // Read the dimensions from the file
-    // Note: make sure ./compute-all-image-sizes.rb is run first.
+    // Note: make sure ./compute-all-image-sizes.py is run first.
     // Future: compute image sizes in node.js.
     var path = this.href().getOrDie();
     var info = JSON.parse(fs.readFileSync(path + '.info'));
@@ -1220,7 +1220,7 @@ function isLeaf(block) {
         var path = block.href().getOrDie();
         if (!seenPaths[path] && !fs.existsSync(path + '.info')) {
           seenPaths[path] = true;
-          sfig_.queue.system(__dirname + '/../bin/compute-image-sizes.rb ' + path);
+          sfig_.queue.system(__dirname + '/../bin/compute-image-sizes.py ' + path);
         }
       }
       block.children.forEach(computeImageSizes);
