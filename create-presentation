@@ -14,8 +14,9 @@ abspath () { case "$1" in /*)printf "%s\n" "$1";; *)printf "%s\n" "$PWD/$1";; es
 real=`abspath $(dirname $0)`
 ln -sf $real $out/sfig || exit 1
 
-cat <<EOF > $out/index.html 
+cat <<EOF > $out/index.html
 <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <script src="sfig/internal/sfig.js"></script>
   <script src="sfig/internal/Graph.js"></script>
   <script src="sfig/internal/RootedTree.js"></script>
