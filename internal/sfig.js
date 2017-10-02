@@ -1557,9 +1557,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Fix up the string
     function fix(x) {
       if (x == null) return x;
-      // Backslash required for metapost in math mode (e.g., '$a\\_b$'), but not on the web, so remove it.
-      if (sfig.isString(x))
-        x = x.replace(/\\_/, '_');
+      if (sfig.isString(x)) {
+        // Backslash required for metapost in math mode (e.g., '$a\\_b$'), but not on the web, so remove it.
+        x = x.replace(/\\_/g, '_');
+        // Backslash required for escaping math mode (doesn't work when have two $)
+        //x = x.replace(/\\\$/g, '$');
+      }
       return x;
     }
     if (sfig.isString(content))
