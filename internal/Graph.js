@@ -354,7 +354,6 @@
 
   sfig_.addProperty(BarGraph, 'barWidth', 30, 'Bar width');
   sfig_.addProperty(BarGraph, 'innerBarSpacing', 2, 'Spacing between bars in a groups');
-  sfig_.addProperty(BarGraph, 'outerBarSpacing', 2, 'Spacing between groups');
 
   BarGraph.prototype.createDataChildren = function() {
     var self = this;
@@ -363,35 +362,34 @@
     var trajectoryColors = this.trajectoryColors().get() || [];
     var barWidth = this.barWidth().getOrDie();
     var innerBarSpacing = this.innerBarSpacing().getOrDie();
-    var outerBarSpacing = this.outerBarSpacing().getOrDie();
 
-    var groupWidth = barWidth * this.trajectories.length + innerBarSpacing * (this.trajectories.length+1) + outerBarSpacing;
+    var n = this.trajectories.length;
+    var groupWidth = barWidth * n + innerBarSpacing * (n - 1);
 
-    for (var i = 0; i <= this.trajectories.length; i++) {
+    for (var i = 0; i <= n; i++) {
       // Add property changers
       (this.propertyChangers[i] || []).forEach(function(changer) { self.addChild(changer); });
       if (i == this.trajectories.length) break;
 
       var trajectory = this.trajectories[i];
 
-      var group = 0;
       trajectory.forEach(function(p) {
         var x = self.xvalueToCoord(p.x);
+        var xOffset = - groupWidth / 2 + (barWidth + innerBarSpacing) * i;
         // Corners
-        var q0 = [x - barWidth/2, self.yvalueToCoord(self.yminValue().getOrDie())];
-        var q1 = [x + barWidth/2, self.yvalueToCoord(p.y)];
+        var q0 = [x + xOffset, self.yvalueToCoord(self.yminValue().getOrDie())];
+        var q1 = [x + xOffset + barWidth, self.yvalueToCoord(p.y)];
         //sfig.L(q0 + ' | ' + q1);
 
         // Create bar
         if (q0[1] == q1[1]) {
           sfig.L('Warning: empty bar will not be visible: ' + q0 + ' | ' + q1);
         } else {
-          var bar = sfig.polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[group] || 'gray');
+          var bar = sfig.polygon(q0, [q0[0], q1[1]], q1, [q1[0], q0[1]]).fillColor(trajectoryColors[i] || 'gray');
           bar.tooltip(p.x + ',' + p.y);
           self.addChild(bar);
           self.addValueLabel(i, p.x, p.y, bar);
         }
-        group++;
       });
     }
   };
