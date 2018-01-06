@@ -197,7 +197,7 @@ function isLeaf(block) {
   MetapostExpr.prototype.ydown = function(yshift) { return new MetapostExpr(this.type, 'yshifted', [this, MetapostExpr.ensureNumeric(yshift).negate()]); }
   MetapostExpr.prototype.xscale = function(xscale) { return new MetapostExpr(this.type, 'xscaled', [this, xscale]); }
   MetapostExpr.prototype.yscale = function(yscale) { return new MetapostExpr(this.type, 'yscaled', [this, yscale]); }
-  MetapostExpr.prototype.rotate = function(rotate) { return new MetapostExpr(this.type, 'rotated', [this, MetapostExpr.ensureNumeric(rotate).negate()]); }
+  MetapostExpr.prototype.rotate = function(rotate) { return rotate ? new MetapostExpr(this.type, 'rotated', [this, MetapostExpr.ensureNumeric(rotate).negate()]) : this; }
 
   MetapostExpr.prototype.assertType = function(type) { if (this.type != type) sfig.throwException('Expected type ' + type + ', but got type ' + this.type + '; value is ' + this); }
   MetapostExpr.prototype.assertPair = function() { this.assertType('pair'); }
@@ -327,8 +327,12 @@ function isLeaf(block) {
       if (xshift != 0) writer.set(block.pic, block.pic.xadd(xshift));
       if (yshift != 0) writer.set(block.pic, block.pic.yadd(yshift));
 
-      // Pivoting around a point not supported right now, use rotatedaround in the future?
-      if (rotate != 0) writer.set(block.pic, block.pic.rotate(rotate));
+      // TODO: Pivoting around a point not supported right now, use
+      // rotatedaround in the future?
+      // TODO: We handle rotation of path-like things in the definition of the
+      // path because rotate on pictures (if done here) doesn't interact well
+      // with externalfigure.  Note that support of rotation is not complete.
+      if (rotate != 0 && block instanceof sfig.Text) writer.set(block.pic, block.pic.rotate(rotate));
 
       if (!isLeaf(block))
         block.children.forEach(applyTransforms);
@@ -370,7 +374,7 @@ function isLeaf(block) {
           start = i+1;
         } else {  // Note: exclude initial '$'
           newStr += func(str.substring(start, i));
-          start = i; 
+          start = i;
         }
         inMathMode = !inMathMode;
       } else {
@@ -562,6 +566,7 @@ function isLeaf(block) {
       else
         opts.push('dashed withdots scaled ' + strokeDasharray[0]);
     }
+
     return opts;
   }
 
@@ -643,7 +648,7 @@ function isLeaf(block) {
       }
       return;
     }
-    
+
     // Lines don't have fill, so don't try (otherwise will crash Metapost).
     if (fillColor == null || this instanceof sfig.Line) {
       // Need to draw stroke, not fill.
@@ -756,6 +761,7 @@ function isLeaf(block) {
     path = path.xscale(xradius*2);
     var yradius = this.yradius().getOrDie();
     path = path.yscale(yradius*2);
+    path = path.rotate(this.rotate().get());
     this.drawPath(writer, path);
   }
 
@@ -766,7 +772,7 @@ function isLeaf(block) {
       args.push(p);
     });
     if (this.closed().get()) args.push('--cycle');
-    var path = sfig.MetapostExpr.path(args);
+    var path = sfig.MetapostExpr.path(args).rotate(this.rotate().get());
     this.drawPath(writer, path);
   }
 
@@ -788,14 +794,14 @@ function isLeaf(block) {
         [x, sfig.down(ry)], '{up}..',
         [x.sub(rx), 0], '--',
         [rx, 0], '{left}..cycle',
-      ]);
+      ]).rotate(this.rotate().get());
     } else {
       path = sfig.MetapostExpr.path([
         [0, 0], '--',
         [0, y], '--',
         [x, y], '--',
         [x, 0], '--cycle',
-      ]);
+      ]).rotate(this.rotate().get());
     }
 
     this.drawPath(writer, path);
@@ -820,7 +826,7 @@ function isLeaf(block) {
       [0, y], '--',
       [x, y], '--',
       [x, 0], '--cycle',
-    ]);
+    ]).rotate(this.rotate().get());
     this.drawPath(writer, path);
   }
 
@@ -951,7 +957,7 @@ function isLeaf(block) {
       '\\documentclass{article}',
       '\\usepackage{color,xcolor,amsmath,amssymb,ulem,verbatim,ifthen}',
       '\\renewcommand{\\familydefault}{'+family+'}');
-    
+
     // Allow us to include Chinese and Arabic
     this.verbatimTex('\\usepackage{CJKutf8,arabtex,utf8}');
     this.verbatimTex('\\setcode{utf8}');
