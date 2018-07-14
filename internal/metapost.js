@@ -379,14 +379,14 @@ function isLeaf(block) {
         inMathMode = !inMathMode;
       } else {
         var m = str.substring(i).match(/^\\begin\{(\w+)\}/);
-        if (m && m[1] != 'cases') {
+        if (m && m[1] !== 'cases' && m[1] !== 'array') {
           if (inMathMode) console.log("Error: can\'t have nested math modes: " + str);
           newStr += func(str.substring(start, i));
           start = i;
           inMathMode = true;
         }
         var m = str.substring(i).match(/^\\end\{(\w+)\}/);
-        if (m && m[1] != 'cases') {
+        if (m && m[1] != 'cases' && m[1] !== 'array') {
           if (!inMathMode) console.log("Error: closing without opening: " + str);
           newStr += str.substring(start, i + m[0].length);
           start = i + m[0].length;
