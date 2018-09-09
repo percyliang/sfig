@@ -5,7 +5,7 @@ mkdir -p external
 
 # MathJax: for rendering math on server side
 # If you don't install MathJax locally, sfig will use the one online.
-wget --no-check-certificate -c http://github.com/mathjax/MathJax/zipball/v2.2-latest -O MathJax-2.2.zip && unzip -q MathJax-2.2.zip && mv mathjax-MathJax-* external/MathJax
+wget --no-check-certificate -c http://github.com/mathjax/MathJax/zipball/v2.4-latest -O MathJax-2.4.zip && unzip -q MathJax-2.4.zip && mv mathjax-MathJax-* external/MathJax
 
 # d3: for visualization
 wget --no-check-certificate -c http://d3js.org/d3.v2.min.js -O external/d3.v2.min.js
