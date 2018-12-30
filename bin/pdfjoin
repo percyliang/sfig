@@ -1,247 +1,26 @@
-#! /bin/sh
+#!/bin/sh
 ##
-##  pdfjoin: A shell program to concatenate PDF pages into one file
+##  pdfjoin: A shell program to concatenate PDF files
 ##
-##  Author David Firth (http://www.warwick.ac.uk/go/dfirth)
+##  Author David Firth (http://go.warwick.ac.uk/dfirth)
 ##
-version=1.20
-echo "This is pdfjoin version ""$version"
+##  This is a simple wrapper for pdfjam, version 2.08
 ##
-##  Relies on pdflatex and the 'pdfpages' package (version 0.2e 
-##  or later).
-##
-#######################################################################
-##  CONFIGURATION: change this block as necessary
-##
-##  THESE SETTINGS WILL BE OVER-RIDDEN by any found at 
-##     /etc/pdfnup.conf
-##     /usr/share/etc/pdfnup.conf
-##     /usr/local/share/pdfnup.conf
-##     /usr/local/etc/pdfnup.conf
-##     ~/.pdfnup.conf
-##  (which are read in that order)
-##  
-##  First say where your "pdflatex" program lives:
-##
-pdflatex=pdflatex
-#pdflatex="pdflatex.exe"    ## this for Windows computers
-##
-##  Next a permitted location for temporary files on your system:
-##
-tempfileDir="/var/tmp" ## /var/tmp is standard on most unix systems
-#tempfileDir="C:/tmp"  ## use something like this under Windows
-##
-##  Now specify the default settings for pdfjoin:
-##
-paper=a4paper   ## alternatives are other LaTeX paper sizes 
-orient=portrait
-fitpaper=true          ## output page size matches input
-turn=true              ## landscape pages are landscape-oriented
-noautoscale=false      ## scale logical pages to fit  
-offset="0 0"           ## output centred on physical page
-trim="0 0 0 0"         ## don't trim the logical pages
-tidy=true              ## delete all temporary files immediately
-##
-##  END OF CONFIGURATION
-#######################################################################
-##
-##  Read the configuration file(s) if such exist:
-##
-for d in /etc /usr/share/etc /usr/local/share /usr/local/etc
-do if test -f $d/pdfnup.conf; then
-   echo "Reading site configuration from $d/pdfnup.conf"
-   source $d/pdfnup.conf
-   fi 
+E_USAGE=64           ##  for a command line usage error
+for arg
+do
+    case $arg in
+	--batch)
+	    printf "pdfjoin ERROR: the --batch option is not allowed\n" 1>&2; 
+	    exit "$E_USAGE" ;;
+	--orient)  ## this was allowed in previous versions of pdfjoin
+	    printf "pdfjoin ERROR: the --orient option is not allowed,\n" 1>&2;
+	    printf "  use --landscape or --no-landscape to specify\n" 1>&2;
+	    printf "  the output page orientation" 1>&2;
+	    exit "$E_USAGE" ;;
+	*) continue ;;
+    esac
 done
-if test -f ~/.pdfnup.conf; then 
-   echo "Reading user defaults from ~/.pdfnup.conf";
-   source ~/.pdfnup.conf; 
-fi
-#######################################################################
-##
-##  Define the output of "pdfjoin --help"
-##
-helptext="
-Usage: pdfjoin args
-where args must include source pdf filenames and optionally also
-* a LaTeX papersize, for example --paper a4paper
-                                 --paper letterpaper
-* the output page orientation, one of --orient landscape
-                                      --orient portrait
-* one of --fitpaper true
-         --fitpaper false
-  to specify whether output page sizes and orientations should match
-  those of the input pages.  Use of --fitpaper true overrides --orient.
-* a page-trimming specification such as
-         --trim \"1cm 1cm 1cm 1cm\"
-  (Note that trimming does not mix well with --frame true.)
-* an \"offset\" specification such as
-         --offset \"1cm 0.5cm\"
-  to offset the position of output pages (see the pdfpages manual)
-* one of --turn true
-         --turn false
-  according to whether or not landscape pages should be displayed in
-  landscape orientation
-* one of --noautoscale true
-         --noautoscale false
-  for scaling of logical pages to fit (or not)
-* a specific name for the output file, e.g. --outfile mybigfile.pdf
-* one of --tidy true
-         --tidy false
-  according to whether or not temporary files should be deleted immediately.
-  If --tidy false is used, such files are left in $tempfileDir.
+exec pdfjam --fitpaper true --rotateoversize true --suffix joined "$@"
 
-Default arguments for you at this site are
-   --paper $paper --trim \"$trim\" --offset \"$offset\" --turn $turn --noautoscale $noautoscale --tidy $tidy
-   
-For information and version history see http://www.warwick.ac.uk/go/pdfjam
-"
-##
-##  Check that necessary LaTeX packages are installed
-##
-PATH=`dirname "$pdflatex"`:$PATH
-export PATH
-case `kpsewhich pdfpages.sty` in
-	"") echo "pdfjoin: pdfpages.sty not installed"; exit 1;;
-esac
-case `kpsewhich eso-pic.sty` in
-	"") echo \
-	    "pdfjoin: eso-pic.sty not installed (see the pdfpages manual)"
-	    exit 1;;
-esac
-case `kpsewhich everyshi.sty` in
-	"") echo \
-	    "pdfjoin: everyshi.sty not installed (see the pdfpages manual)"
-	    exit 1;;
-esac
-##
-##  Now do the argument loop...
-##
-sourcePath=
-outFile=
-inFiles=0
-newline='
-'
-while test -n "${1}"; do
-  case "${1}" in
-  	*.pdf) inFiles=`expr $inFiles + 1`;
-  	       sourcePath="$sourcePath$newline${1}";;
-  	--help) echo "$helptext";
-            exit 0;;
-  	--outfile) outFile="${2}" 
-  	           case "$outFile" in
-  	           	*".pdf");;
-  	           	*) echo "pdfjoin: outfile name must end in .pdf"; 
-  	           	   exit 1;;
-  	           esac
-  	           shift;;
-  	--paper) paper="${2}"
-  	         shift;;
-  	--orient) orient="${2}"
-  	          shift;;
-  	--fitpaper) fitpaper="${2}"
-  	          shift;;
-  	--trim) trim="${2}"
-  	          shift;;
-  	--offset) offset="${2}"
-  	          shift;;
-  	--turn) turn="${2}"
-  	          shift;;
-  	--noautoscale) noautoscale="${2}"
-  	          shift;;
-  	--tidy) tidy="${2}"
-  	          shift;;
-  	*) echo "pdfjoin: unrecognised argument ${1}"; exit 1;;
-  esac
-  shift
-done
-case "$sourcePath" in
-  "") echo "pdfjoin: no pdf source file specified
-For information on usage try \"pdfjoin --help\""; exit 1;;
-esac
-OIFS=IFS
-IFS="$newline"
-for k in $sourcePath
-do
-  if test -f "$k"; then :; 
-    else echo "pdfjoin: ""$k"" does not exist, no files were processed"; 
-    exit 1;
-  fi
-done
-##
-##  That's the arguments done.
-##
-##
-##  Now work on the input files
-##
-pwd=`pwd | sed 's/ /\\ /'`
-sourceFullPath=""
-for inFile in $sourcePath
-do
-  pdfName=`basename "$inFile"`
-  sourceDir=`dirname "$inFile"` ; cd "$sourceDir" ; sourceDir=`pwd`
-  sourceFullPath=$sourceFullPath$newline"$sourceDir"/"$pdfName"
-  cd "$pwd"
-done
-case "$outFile" in
-	  "") ## no --outfile argument supplied
-	      outfileNameRoot=`echo "$pdfName" | sed 's/\.pdf$//'`-joined;
-	      outfileDir="$sourceDir";
-	      outFile="$outfileNameRoot"".pdf";;
-	   *) ## --outfile argument was supplied
-	      outfileNameRoot=`basename "$outFile" | sed 's/\.pdf$//';`
-	      outfileDir=`dirname "$outFile"` ; 
-	      cd "$outfileDir" ; 
-	      outfileDir=`pwd` ;;
-esac
-##
-##  Now set up the temporary LaTeX input file
-##
-uniqueName="$$"
-i=0
-linkedSources=""
-for k in $sourceFullPath
-do
-  i=`expr $i + 1`
-  ln -s "$k" "$tempfileDir"/"$uniqueName"source$i.pdf
-  linkedSources=$linkedSources$newline"$tempfileDir"/"$uniqueName"source$i.pdf
-done
-texFile="$tempfileDir"/"$uniqueName".tex
-msgFile="$tempfileDir"/"$uniqueName".msgs
-mytemp=`cat <<EndTemplate
-\documentclass[papersize,orientation]{article}
-\usepackage{pdfpages}
-\begin{document}
-EndTemplate
-`
-IFS=OIFS
-mytemp2=`echo $linkedSources | grep 'pdf' \
-    | sed 's/^/\\\\includepdf[pages=-,fitpaper=,trim=,offset=,turn=,noautoscale=]{/' | sed 's/$/}/'`
-echo $mytemp$newline$mytemp2$newline\\end{document} \
-    | sed 's/^[^b]egin/\\begin/' \
-    | sed s/orientation/"$orient"/ \
-    | sed s/fitpaper=/fitpaper="$fitpaper"/ \
-    | sed s/trim=/trim="$trim"/ \
-    | sed s/turn=/turn="$turn"/ \
-    | sed s/offset=/offset="$offset"/ \
-    | sed s/noautoscale=/noautoscale="$noautoscale"/ \
-    | sed s/papersize/"$paper"/ > $texFile
-echo "  Temporary LaTeX file for this job is ""$texFile"
-##
-##  Now run pdflatex and tidy up
-##
-echo "  Calling pdflatex..."
-cd "$tempfileDir"
-"$pdflatex" --interaction batchmode "$texFile" > "$msgFile"
-if test -f "$tempfileDir"/"$uniqueName"".aux";  
-      ## ie if LaTeX didn't choke
-  then if cp "$tempfileDir"/"$uniqueName".pdf \
-             "$outfileDir"/"$outfileNameRoot"".pdf"
-       then echo "  Finished: output is"\
-                 "$outfileDir"/"$outfileNameRoot"".pdf"
-       fi
-       case "$tidy" in
-         true) rm "$tempfileDir"/"$uniqueName"* ;;
-       esac
-  else echo "  Failed: output file not written"
-fi 
+
