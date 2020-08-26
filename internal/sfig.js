@@ -1034,111 +1034,92 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Block.prototype.elemString = function() { return new XMLSerializer().serializeToString(this.elem); }
 
   // TODO: optimize (don't recurse if nothing to set)
-  Block.prototype.setStrokeFillProperties = function(elem, direct) {
+  Block.prototype.setElemStyles = function() {
     // If this is set, then we initially set the opacity and then clear it when
     // mouse enters with the shift key.
     const mouseShowHide = this.mouseShowHide().get();
 
-    if (direct) {
-      console.log('setStrokeFillProperties', elem, direct);
-    }
+    const strokeColor = this.strokeColor().get();
+    const fillColor = this.fillColor().get();
+    const strokeWidth = this.strokeWidth().get();
+    const strokeDasharray = this.strokeDasharray().get();
+    const strokeOpacity = this.strokeOpacity().get();
+    const fillOpacity = this.fillOpacity().get();
 
-    function setElemStyle(elem, svgProperty, foreignProperty, value) {
-      if (['div', 'font', 'image'].includes(elem.tagName.toLowerCase())) {
-        elem.style[foreignProperty] = value;
-      } else {
-        elem.style[svgProperty] = value;
+    console.log('setElemStyles', this.elem);
+
+    function setStyle(elem, svgProperty, foreignProperty, value, defaultValue) {
+      // Set the style property of `elem` to `value`.  The exact property
+      // depends on whether it's an SVG element or a normal HTML element.
+      // If `value` is empty and `elem` doesn't have a value, then use `defaultValue`.
+      const property = ['div', 'font', 'image'].includes(elem.tagName.toLowerCase()) ? foreignProperty : svgProperty;
+
+      // Special case: handle <font color="red">...</font>, where the property
+      // is not in the color.
+      let existingValue = elem.style[property];
+      if (foreignProperty === 'color' && elem.color) {
+        existingValue = elem.color;
+      }
+
+      if (value != null || defaultValue != null) {
+        console.log('setStyle', elem, svgProperty, foreignProperty, '| value:', value, '| default:', defaultValue, '| existing:', existingValue);
+      }
+
+      if (value != null) {
+        elem.style[property] = value;
+      } else if (defaultValue != null && existingValue === '') {
+        elem.style[property] = defaultValue;
       }
     }
 
-    // Need to recurse to handle MathJax
-    // Text is rendered as:
-    // - foreignObject / div / ...
-    // Any math inside is rendered as;
-    // - span / svg / g / {g, use, rect}
-    function forEachChild(elem, func, maxDepth) {
-      // Apply `func` to all descendents of SVG element `elem`.
-      console.log('forEachChild', elem, elem.tagName);
-      function recurse(elem, depth) {
-        if (maxDepth && depth >= maxDepth) {
-          return;
+    function recursivelySetStyles(elem, isTop) {
+      // Recursively applies the desired styles to every sub-element of `elem`.
+      // A prime example is `Text` that includes math, which has a nested
+      // structure corresponding to the hierarchical structure of the
+      // mathematical expression.  We need this to be able to change the color,
+      // or do support mouseShowHide.
+      // Note:
+      // - Text is rendered as: foreignObject / div / ...
+      // - Any math inside is rendered as: // - span / svg / g / {g, use, rect}
+      console.log('recursivelySetStyles', elem, isTop);
+      if (elem.childElementCount === 0) {
+        setStyle(elem, 'stroke', 'color', strokeColor, sfig.defaultStrokeColor);
+        if (isTop) {
+          setStyle(elem, 'fill', 'backgroundColor', fillColor, sfig.defaultFillColor);
         }
-        if (elem.childElementCount === 0) {
-          console.log('recurse leaf', elem);
-          func(elem);
-        } else {
-          for (let i = 0; i < elem.childNodes.length; i++) {  // Modify underlying div
-            recurse(elem.childNodes[i], depth + 1);
-          }
-        }
-      }
-      if (elem.tagName == 'foreignObject') {  // Usually text
-        recurse(elem, 0);
-      } else {
-        func(elem);
-      }
-    }
+        setStyle(elem, 'strokeWidth', null, strokeWidth, sfig.defaultStrokeWidth);
+        setStyle(elem, 'strokeDasharray', null, strokeDasharray && strokeDasharray.join(' '), null);
 
-    function recursiveSetElemStyle(elem, svgProperty, foreignProperty, value, maxDepth) {
-      forEachChild(elem, (subElem) => {
-        setElemStyle(subElem, svgProperty, foreignProperty, value);
-      }, maxDepth);
-    }
+        setStyle(elem, 'strokeOpacity', 'opacity', mouseShowHide ? sfig.defaultVeilOpacity : strokeOpacity);
+        setStyle(elem, 'fillOpacity', 'opacity', mouseShowHide ? sfig.defaultVeilOpacity : fillOpacity);
 
-    if (elem.tagName == 'g') {
-      // Recursively set properties
-      // Note: this function gets called multiple times; for example, for (a (b
-      // c)), we'd have [c, b, c, a, b, c], which is inefficient.
-      for (let i = 0; i < elem.childNodes.length; i++)
-        this.setStrokeFillProperties(elem.childNodes[i], false);
-    } else {
-      var strokeColor = this.strokeColor().get();
-      if (strokeColor == null && direct) strokeColor = sfig.defaultStrokeColor;  // Set default
-      if (strokeColor != null) recursiveSetElemStyle(elem, 'stroke', 'color', strokeColor);
-
-      var fillColor = this.fillColor().get();
-      if (fillColor == null && direct) fillColor = sfig.defaultFillColor;  // Set default
-      if (fillColor != null) recursiveSetElemStyle(elem, 'fill', 'backgroundColor', fillColor, 1);
-
-      var strokeWidth = this.strokeWidth().get();
-      if (strokeWidth == null && direct) strokeWidth = sfig.defaultStrokeWidth;  // Set default
-      if (strokeWidth != null) elem.style.strokeWidth = strokeWidth;
-
-      var strokeDasharray = this.strokeDasharray().get();
-      if (strokeDasharray != null) elem.style.strokeDasharray = strokeDasharray.join(' ');
-
-      var hideForNow = mouseShowHide && direct;
-
-      var strokeOpacity = this.strokeOpacity().get();
-      if (hideForNow) {
-        recursiveSetElemStyle(elem, 'strokeOpacity', 'opacity', sfig.defaultVeilOpacity);
-      } else if (strokeOpacity != null) {
-        recursiveSetElemStyle(elem, 'strokeOpacity', 'opacity', strokeOpacity);
-      }
-
-      var fillOpacity = this.fillOpacity().get();
-      if (hideForNow) {
-        recursiveSetElemStyle(elem, 'fillOpacity', 'opacity', sfig.defaultVeilOpacity);
-      } else if (fillOpacity != null) {
-        recursiveSetElemStyle(elem, 'fillOpacity', 'opacity', fillOpacity);
-      }
-
-      if (hideForNow) {
-        // Set the true strokeOpacity and fillOpacity when mouse enters
-        forEachChild(elem, function(subElem) {
-          subElem.onmouseenter = function(e) {
+        if (mouseShowHide) {
+          // Set the true strokeOpacity and fillOpacity when mouse enters
+          elem.onmouseenter = function(e) {
             const hide = e.shiftKey;
-            setElemStyle(subElem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : strokeOpacity);
-            setElemStyle(subElem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : fillOpacity);
+            const defaultOpacity = 1;
+            // Don't pass `defaultOpacity` in as a `defaultValue` since we want
+            // to override the existing value (which was set to
+            // sfig.defaultVeilOpacity).
+            setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (strokeOpacity || defaultOpacity));
+            setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (fillOpacity || defaultOpacity));
           };
-        });
+        }
+        return;
+      }
+
+      // Recurse on children (note that we do it for all nodes, not elements).
+      for (let i = 0; i < elem.childNodes.length; i++) {
+        recursivelySetStyles(elem.childNodes[i], false);
       }
     }
+
+    recursivelySetStyles(this.elem, true);
   }
 
   // Call this function when change properties of this Block and want to propagate to elem.
   Block.prototype.updateElem = function() {
-    this.setStrokeFillProperties(this.elem, true);
+    this.setElemStyles(this.elem);
     return this;
   }
 
@@ -1394,7 +1375,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Block.prototype.postRender = function(state) {
     if (this.elem == null) sfig.throwException('renderElem didn\'t return anything: '+this);
-    this.setStrokeFillProperties(this.elem, true);
+    this.setElemStyles();
     this.applyTransforms(state);
 
     // Hide initially until explicitly shown.
