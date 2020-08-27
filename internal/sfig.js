@@ -1116,8 +1116,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
       // Recurse on children (note that we do it for all nodes, not elements).
       // Only do it if we have any children and we're not a group.
       if (blockHasProperties || !blockHasChildren) {
-        for (let i = 0; i < elem.childNodes.length; i++) {
-          recursivelySetStyles(elem.childNodes[i], false);
+        for (let child of elem.childNodes) {
+          recursivelySetStyles(child, false);
         }
       }
     }
@@ -1133,7 +1133,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Hacky: look inside the element to get the strokeWidth property
   function getStrokeWidth(elem) {
-    if (elem.style.strokeWidth != '')
+    if (elem.style && elem.style.strokeWidth != '')
       return parseFloat(elem.style.strokeWidth); // Assume units are pixels
     if (elem.childElementCount == 1)
       return getStrokeWidth(elem.firstChild);
