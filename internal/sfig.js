@@ -1033,7 +1033,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   Block.prototype.elemString = function() { return new XMLSerializer().serializeToString(this.elem); }
 
-  // TODO: optimize (don't recurse if nothing to set)
   Block.prototype.setElemStyles = function() {
     // If this is set, then we initially set the opacity and then clear it when
     // mouse enters with the shift key.
@@ -1049,21 +1048,21 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // Do we have any properties to set?
     const blockHasProperties = strokeColor != null || fillColor != null || strokeWidth != null || strokeDasharray != null || strokeOpacity != null || fillOpacity != null;
     const blockHasChildren = this.children.length > 0;
+    const blockIsText = this instanceof sfig.Text;
 
     console.log('setElemStyles', this.elem);
+
+    function isSvg(elem) {
+      const tagName = elem.tagName.toLowerCase();
+      return !['span', 'div', 'font', 'image'].includes(tagName);
+    }
 
     function setStyle(elem, svgProperty, foreignProperty, value, defaultValue) {
       // Set the style property of `elem` to `value`.  The exact property
       // depends on whether it's an SVG element or a normal HTML element.
       // If `value` is empty and `elem` doesn't have a value, then use `defaultValue`.
-      const property = ['div', 'font', 'image'].includes(elem.tagName.toLowerCase()) ? foreignProperty : svgProperty;
-
-      // Special case: handle <font color="red">...</font>, where the property
-      // is not in the color.
-      let existingValue = elem.style[property];
-      if (foreignProperty === 'color' && elem.color) {
-        existingValue = elem.color;
-      }
+      const property = isSvg(elem) ? svgProperty : foreignProperty;
+      const existingValue = elem.style[property];
 
       if (value != null || defaultValue != null) {
         console.log('setStyle', elem, svgProperty, foreignProperty, '| value:', value, '| default:', defaultValue, '| existing:', existingValue);
@@ -1076,20 +1075,32 @@ sfig.down = function(x) { return x * sfig.downSign; };
       }
     }
 
-    function recursivelySetStyles(elem, isTop) {
+    function recursivelySetStyles(elem, isTop, defaultStrokeColor) {
       // Recursively applies the desired styles to every sub-element of `elem`.
-      // A prime example is `Text` that includes math, which has a nested
+      // - An example is `Text` that includes math, which has a nested
       // structure corresponding to the hierarchical structure of the
       // mathematical expression.  We need this to be able to change the color,
       // or do support mouseShowHide.
+      // - Some of the elements will have properties already set, so stop propagating defaults down.
       // Note:
       // - Text is rendered as: foreignObject / div / ...
       // - Any math inside is rendered as: span / svg / g / {g, use, rect}
       console.log('recursivelySetStyles', elem, '| isTop:', isTop);
 
+      // If element already has color not directly through sfig:
+      // - <g stroke="...">...</g> (when use MathJax $\\red{x}$)
+      // - <font color="red">...</font>
+      // don't propagate default color there.
+      if ((elem.attributes && elem.attributes.stroke) || elem.color) {
+        defaultStrokeColor = null;
+      }
+
       if (elem.childElementCount === 0) {
-        setStyle(elem, 'stroke', 'color', strokeColor, sfig.defaultStrokeColor);
-        if (isTop) {
+        setStyle(elem, 'stroke', 'color', strokeColor, defaultStrokeColor);
+        if (blockIsText && isSvg(elem)) {
+          // Stroke color determines fill color for text (only in SVG)
+          setStyle(elem, 'fill', 'backgroundColor', strokeColor, defaultStrokeColor);
+        } else {
           setStyle(elem, 'fill', 'backgroundColor', fillColor, sfig.defaultFillColor);
         }
         setStyle(elem, 'strokeWidth', null, strokeWidth, sfig.defaultStrokeWidth);
@@ -1105,7 +1116,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
             const defaultOpacity = 1;
             // Don't pass `defaultOpacity` in as a `defaultValue` since we want
             // to override the existing value (which was set to
-            // sfig.defaultVeilOpacity).
+            // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
             setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (strokeOpacity || defaultOpacity));
             setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (fillOpacity || defaultOpacity));
           };
@@ -1113,16 +1124,29 @@ sfig.down = function(x) { return x * sfig.downSign; };
         return;
       }
 
-      // Recurse on children (note that we do it for all nodes, not elements).
-      // Only do it if we have any children and we're not a group.
+      // Recurse on children if the block doesn't have children (because those
+      // children would have already been handled) and there's some properties
+      // to change.
       if (blockHasProperties || !blockHasChildren) {
+        // Some children are text; wrap them in span so we can modify
+        // properties (e.g., opacity for mouseShowHide).
+        for (let i = 0; i < elem.childNodes.length; i++) {
+          const child = elem.childNodes[i];
+          if (child.nodeName === '#text') {
+            const text = child.nodeValue;
+            const span = sfig_.newElem('span');
+            span.innerHTML = text;
+            elem.replaceChild(span, child);
+          }
+        }
+
         for (let child of elem.childNodes) {
-          recursivelySetStyles(child, false);
+          recursivelySetStyles(child, false, defaultStrokeColor);
         }
       }
     }
 
-    recursivelySetStyles(this.elem, true);
+    recursivelySetStyles(this.elem, true, sfig.defaultStrokeColor);
   }
 
   // Call this function when change properties of this Block and want to propagate to elem.
