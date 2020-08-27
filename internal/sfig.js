@@ -1046,6 +1046,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
     const strokeOpacity = this.strokeOpacity().get();
     const fillOpacity = this.fillOpacity().get();
 
+    // Do we have any properties to set?
+    const blockHasProperties = strokeColor != null || fillColor != null || strokeWidth != null && strokeDasharray != null || strokeOpacity != null || fillOpacity != null;
+    const blockHasChildren = this.children.length > 0;
+
     console.log('setElemStyles', this.elem);
 
     function setStyle(elem, svgProperty, foreignProperty, value, defaultValue) {
@@ -1080,8 +1084,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
       // or do support mouseShowHide.
       // Note:
       // - Text is rendered as: foreignObject / div / ...
-      // - Any math inside is rendered as: // - span / svg / g / {g, use, rect}
-      console.log('recursivelySetStyles', elem, isTop);
+      // - Any math inside is rendered as: span / svg / g / {g, use, rect}
+      console.log('recursivelySetStyles', elem, '| isTop:', isTop);
+
       if (elem.childElementCount === 0) {
         setStyle(elem, 'stroke', 'color', strokeColor, sfig.defaultStrokeColor);
         if (isTop) {
@@ -1109,8 +1114,11 @@ sfig.down = function(x) { return x * sfig.downSign; };
       }
 
       // Recurse on children (note that we do it for all nodes, not elements).
-      for (let i = 0; i < elem.childNodes.length; i++) {
-        recursivelySetStyles(elem.childNodes[i], false);
+      // Only do it if we have any children and we're not a group.
+      if (blockHasProperties || !blockHasChildren) {
+        for (let i = 0; i < elem.childNodes.length; i++) {
+          recursivelySetStyles(elem.childNodes[i], false);
+        }
       }
     }
 
