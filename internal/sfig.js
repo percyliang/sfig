@@ -1047,7 +1047,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     const fillOpacity = this.fillOpacity().get();
 
     // Do we have any properties to set?
-    const blockHasProperties = strokeColor != null || fillColor != null || strokeWidth != null && strokeDasharray != null || strokeOpacity != null || fillOpacity != null;
+    const blockHasProperties = strokeColor != null || fillColor != null || strokeWidth != null || strokeDasharray != null || strokeOpacity != null || fillOpacity != null;
     const blockHasChildren = this.children.length > 0;
 
     console.log('setElemStyles', this.elem);
