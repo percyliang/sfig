@@ -1052,9 +1052,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     console.log('setElemStyles', this.elem);
 
+    function getTagName(elem) {
+      return elem.tagName.toLowerCase();
+    }
+
     function isSvg(elem) {
-      const tagName = elem.tagName.toLowerCase();
-      return !['span', 'div', 'font', 'image'].includes(tagName);
+      return !['span', 'div', 'font', 'image'].includes(getTagName(elem));
     }
 
     function setStyle(elem, svgProperty, foreignProperty, value, defaultValue) {
@@ -1072,6 +1075,25 @@ sfig.down = function(x) { return x * sfig.downSign; };
         elem.style[property] = value;
       } else if (defaultValue != null && existingValue === '') {
         elem.style[property] = defaultValue;
+      }
+    }
+
+    function wrapSpans(elem) {
+      // Some children are text nodes.  wrap them in span so we can modify
+      // their properties (e.g., opacity for mouseShowHide).
+      for (let child of elem.childNodes) {
+        wrapSpans(child);
+      }
+
+      for (let i = 0; i < elem.childNodes.length; i++) {
+        const child = elem.childNodes[i];
+        if (child.nodeName === '#text') {
+          // Replace "foo" with "<span>foo</span>"
+          const text = child.nodeValue;
+          const span = sfig_.newElem('span');
+          span.innerHTML = text;
+          elem.replaceChild(span, child);
+        }
       }
     }
 
@@ -1128,24 +1150,15 @@ sfig.down = function(x) { return x * sfig.downSign; };
       // children would have already been handled) and there's some properties
       // to change.
       if (blockHasProperties || !blockHasChildren) {
-        // Some children are text; wrap them in span so we can modify
-        // properties (e.g., opacity for mouseShowHide).
-        for (let i = 0; i < elem.childNodes.length; i++) {
-          const child = elem.childNodes[i];
-          if (child.nodeName === '#text') {
-            const text = child.nodeValue;
-            const span = sfig_.newElem('span');
-            span.innerHTML = text;
-            elem.replaceChild(span, child);
-          }
-        }
-
         for (let child of elem.childNodes) {
           recursivelySetStyles(child, false, defaultStrokeColor);
         }
       }
     }
 
+    if (blockIsText) {
+      wrapSpans(this.elem);
+    }
     recursivelySetStyles(this.elem, true, sfig.defaultStrokeColor);
   }
 
