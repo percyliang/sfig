@@ -1135,24 +1135,51 @@ sfig.down = function(x) { return x * sfig.downSign; };
           // Set the true strokeOpacity and fillOpacity when mouse enters
           elem.onmouseenter = function(e) {
             const hide = e.shiftKey;
-            const defaultOpacity = 1;
-            // Don't pass `defaultOpacity` in as a `defaultValue` since we want
-            // to override the existing value (which was set to
-            // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
-            setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (strokeOpacity || defaultOpacity));
-            setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : (fillOpacity || defaultOpacity));
+            recursivelyShowHide(ancestorElem, hide);
+          };
+
+          let ancestorElem = elem;  // Keep track of ancestor
+          // If click, then move `ancestorElem` up and apply show/hide to that.
+          elem.onclick = function(e) {
+            const hide = e.shiftKey;
+            // Go up unary chains
+            while (ancestorElem.parentElement && ancestorElem.parentElement.childElementCount === 1) {
+              ancestorElem = ancestorElem.parentElement;
+            }
+            // Go up one level
+            if (ancestorElem.parentElement) {
+              ancestorElem = ancestorElem.parentElement;
+              recursivelyShowHide(ancestorElem, hide);
+            }
           };
         }
         return;
       }
 
-      // Recurse on children if the block doesn't have children (because those
-      // children would have already been handled) and there's some properties
+      // Recurse on children.  Optimization: if the block doesn't have children
+      // (because those children would have already been handled) and there's
+      // some properties
       // to change.
       if (blockHasProperties || !blockHasChildren) {
-        for (let child of elem.childNodes) {
+        for (let child of elem.children) {
           recursivelySetStyles(child, false, defaultStrokeColor);
         }
+      }
+    }
+
+    function recursivelyShowHide(elem, hide) {
+      if (elem.childElementCount === 0) {
+        const defaultOpacity = 1;
+        // Note: use defaultOpacity rather than true opacity (most of the time, it's just 1)
+        // Don't pass `defaultOpacity` in as a `defaultValue` since we want
+        // to override the existing value (which was set to
+        // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
+        setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
+        setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
+        return;
+      }
+      for (let child of elem.children) {
+        recursivelyShowHide(child, hide);
       }
     }
 
@@ -1321,7 +1348,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     function recurse(elem) {
       if (elem.style) elem.style.display = target;
       for (var i = 0; i < elem.childElementCount; i++)
-        recurse(elem.childNodes[i]);
+        recurse(elem.children[i]);
     }
     recurse(this.elem);
     return target == null;
@@ -2880,6 +2907,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   // Return an element which looks like |button|, but when pressed will toggle display of |explanation| under it.
   sfig.explain = function(button, explanation, options) {
+    // Too complex, don't use
     if (options == null) options = {};
     var pivot = options.pivot;
     if (pivot == null) sfig.throwException('Missing pivot');
@@ -2888,7 +2916,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     if (options.borderWidth)
       button = sfig.frame(button).bg.round(5).strokeWidth(options.borderWidth).end.padding(5);
     explanation = frame(explanation).bg.fillColor('#F7F9D0').strokeWidth(2).end.padding(5);
-    explanation.scale(options.explanationScale || sfig.defaultExplanationScale); 
+    explanation.scale(options.explanationScale || sfig.defaultExplanationScale);
     var x, y;
     if (pivot[0] == -1) x = button.left();
     else if (pivot[0] == 1) x = button.right();
