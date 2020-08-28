@@ -178,7 +178,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.AuxiliaryInfo = function() { }
 
   sfig.throwException = function(message) {
-    console.log(new Error().stack); 
+    console.log(new Error().stack);
     throw message;
   }
 
@@ -1050,7 +1050,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     const blockHasChildren = this.children.length > 0;
     const blockIsText = this instanceof sfig.Text;
 
-    console.log('setElemStyles', this.elem);
+    //console.log('setElemStyles', this.elem);
 
     function getTagName(elem) {
       return elem.tagName.toLowerCase();
@@ -1068,7 +1068,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       const existingValue = elem.style[property];
 
       if (value != null || defaultValue != null) {
-        console.log('setStyle', elem, svgProperty, foreignProperty, '| value:', value, '| default:', defaultValue, '| existing:', existingValue);
+        //console.log('setStyle', elem, svgProperty, foreignProperty, '| value:', value, '| default:', defaultValue, '| existing:', existingValue);
       }
 
       if (value != null) {
@@ -1107,7 +1107,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       // Note:
       // - Text is rendered as: foreignObject / div / ...
       // - Any math inside is rendered as: span / svg / g / {g, use, rect}
-      console.log('recursivelySetStyles', elem, '| isTop:', isTop);
+      //console.log('recursivelySetStyles', elem, '| isTop:', isTop);
 
       // If element already has color not directly through sfig:
       // - <g stroke="...">...</g> (when use MathJax $\\red{x}$)
@@ -1169,11 +1169,20 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     function recursivelyShowHide(elem, hide) {
       if (elem.childElementCount === 0) {
-        const defaultOpacity = 1;
-        // Note: use defaultOpacity rather than true opacity (most of the time, it's just 1)
+        // Note: use defaultOpacity rather than true opacity from the Block
+        // properties (which we don't have, since this function might be called
+        // beyond the Block).
+        const defaultOpacity = '';
+
+        // There's a bug in Firefox (but not Chrome) where we have
+        // overlay(rect(...), X) and entering the larger rect makes X
+        // invisible.  Working around this by replacing the border rect in
+        // Slide with a bunch of lines.
+
         // Don't pass `defaultOpacity` in as a `defaultValue` since we want
         // to override the existing value (which was set to
         // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
+
         setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
         setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
         return;
@@ -2024,7 +2033,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   // desired width/height specified on this Image, return the actual
   // width/height to use.
   Image.prototype.computeDesiredDim = function(origWidth, origHeight) {
-    // Preserve aspect ratio if only one of 
+    // Preserve aspect ratio if only one of
     var aspectRatio = origWidth / origHeight;
     var width = this.width().get();
     var height = this.height().get();
@@ -2371,12 +2380,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
         //     ||
         //   w || len
         //     ||
-        //     p2 
+        //     p2
         //  u /||\ v
         //   / ||a\
         // p1  ||  \
         //          p3
-        // Compute angle 
+        // Compute angle
         var ux = p1[0] - p2[0];
         var uy = p1[1] - p2[1];
         var vx = p3[0] - p2[0];
@@ -2810,7 +2819,22 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
     this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
     this.body.setEnd(this);
-    this.border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
+    //this.border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
+    // Draw the border as individual lines rather than a rectangle.  This means
+    // that the interior of the slide is not part of the border, so clicking or
+    // entering it doesn't trigger any events on the border.  This is to work
+    // around a Firefox bug for mouseShowHide where entering causes other
+    // elements to be hidden and accidentally clicking on the interior shows
+    // everything at once.  However, we won't be able to set the color of the
+    // background.
+    function hollowRect(width, height, strokeWidth) {
+      const corners = [[0, 0], [width, 0], [width, height], [0, height]];
+      const lines = [0, 1, 2, 3].map((i) => {
+        return sfig.line(corners[i], corners[(i + 1) % corners.length]).strokeWidth(strokeWidth);
+      });
+      return sfig.overlay.apply(null, lines);
+    }
+    this.border = hollowRect(this.width(), this.height(), this.borderWidth());
     this.border.setEnd(this);
   };
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
@@ -3163,7 +3187,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
     // When press down key, want to hide cursor.
     // But sometimes this triggers a mouse move,
-    // so we need to ignore 
+    // so we need to ignore
     var justHid;
 
     document.documentElement.addEventListener('keydown', function(event) {
