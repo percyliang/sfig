@@ -1097,6 +1097,14 @@ sfig.down = function(x) { return x * sfig.downSign; };
       }
     }
 
+    function isLeaf(elem) {
+      // Return whether `elem` is a leaf (we only set styles on leaves).
+      // Exception: some elements (e.g., Graph) use tooltips,
+      // which have a <title>[tooltip]</title> child.
+      return elem.childElementCount === 0 ||
+          elem.childElementCount === 1 && elem.children[0].tagName === 'title';
+    }
+
     function recursivelySetStyles(elem, isTop, defaultStrokeColor) {
       // Recursively applies the desired styles to every sub-element of `elem`.
       // - An example is `Text` that includes math, which has a nested
@@ -1117,7 +1125,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
         defaultStrokeColor = null;
       }
 
-      if (elem.childElementCount === 0) {
+      if (isLeaf(elem)) {
         setStyle(elem, 'stroke', 'color', strokeColor, defaultStrokeColor);
         if (blockIsText && isSvg(elem)) {
           // Stroke color determines fill color for text (only in SVG)
@@ -1168,7 +1176,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
 
     function recursivelyShowHide(elem, hide) {
-      if (elem.childElementCount === 0) {
+      if (isLeaf(elem)) {
         // Note: use defaultOpacity rather than true opacity from the Block
         // properties (which we don't have, since this function might be called
         // beyond the Block).
@@ -1182,7 +1190,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
         // Don't pass `defaultOpacity` in as a `defaultValue` since we want
         // to override the existing value (which was set to
         // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
-
         setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
         setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
         return;
