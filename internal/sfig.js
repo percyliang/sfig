@@ -1145,6 +1145,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
         if (mouseShowHide) {
           // Set the true strokeOpacity and fillOpacity when mouse enters
           elem.onmouseenter = function(e) {
+            if (e.ctrlKey) {  // Allows us to move over regions without making changes
+              return;
+            }
             const hide = e.shiftKey;
             recursivelyShowHide(ancestorElem, hide);
           };
