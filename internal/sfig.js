@@ -19,7 +19,7 @@ if (typeof global != 'undefined') {
 // Default parameters which can be overridden.
 
 sfig.homePage = 'http://github.com/percyliang/sfig';
-sfig.version = '1.1';
+sfig.version = '1.2';
 sfig.defaultStrokeWidth = 1;
 sfig.defaultStrokeColor = 'black';
 sfig.defaultFillColor = 'none';
