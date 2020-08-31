@@ -1020,13 +1020,16 @@ sfig.down = function(x) { return x * sfig.downSign; };
     return [this.left().get() + mx + dx, this.top().get() + my + dy];
   }
 
-  Block.prototype.recMouseShowHide = function(value) {
+  Block.prototype.recMouseShowHide = function(value, setIfMissing) {
     // Recursively set the mouseShowHide property on all descendents.
     // Note: this should be the last property set, because this freezes everything.
     this.freeze();  // Make children accessible
+    if (setIfMissing && this.mouseShowHide().get() != null) {  // Don't set if already set
+      return this;
+    }
     this.mouseShowHide(value);
     for (const child of this.children) {
-      child.recMouseShowHide(value);
+      child.recMouseShowHide(value, setIfMissing);
     }
     return this;
   }
@@ -1036,7 +1039,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Block.prototype.setElemStyles = function() {
     // If this is set, then we initially set the opacity and then clear it when
     // mouse enters with the shift key.
-    const mouseShowHide = this.mouseShowHide().get();
+    const mouseShowHide = this.mouseShowHide().exists() ? this.mouseShowHide().get() : sfig_.urlParams.defaultMouseShowHide;
 
     const strokeColor = this.strokeColor().get();
     const fillColor = this.fillColor().get();
@@ -3172,6 +3175,16 @@ sfig.down = function(x) { return x * sfig.downSign; };
     });
     this.registerKey('Set display mode: print (6pp)', ['shift-p'], function(callback) {
       sfig_.setDisplayMode(sfig_.DISPLAYMODE_PRINT6PP);
+    });
+
+    this.registerKey('Toggle mouse show/hide', ['shift-m'], function(callback) {
+      if (sfig_.urlParams.defaultMouseShowHide) {
+        delete sfig_.urlParams.defaultMouseShowHide;
+      } else {
+        sfig_.urlParams.defaultMouseShowHide = true;
+      }
+      self.updateUrlParams();
+      window.location.reload();
     });
 
     this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {

@@ -36,6 +36,7 @@
     var minx, miny, maxx, maxy;
     this.propertyChangers = []
     this.trajectories = [];
+    if (items.length === 0) return;
     var i = 0;
     Array.prototype.slice.call(items).forEach(function(item) {
       if (item instanceof sfig.PropertyChanger) {
