@@ -69,15 +69,16 @@
 
     // For each of the axes...
     for (var axis = 0; axis <= 1; axis++) {
+      const outputs = [];
       var length = this.length()[axis].getOrDie();
       var otherLength = this.length()[1-axis].getOrDie();
       var overshoot = this.overshoot()[axis].getOrDie();
 
       // Axis
       if (axis == 0)  // x-axis
-        this.addChild(line([0, 0], [length + overshoot, 0]));
+        outputs.push(line([0, 0], [length + overshoot, 0]));
       else  // y-axis
-        this.addChild(line([0, 0], [0, -sfig.downSign * (length + overshoot)]));
+        outputs.push(line([0, 0], [0, -sfig.downSign * (length + overshoot)]));
 
       //// Ticks and tick labels
       var tickStyle = this.tickStyle()[axis].get();
@@ -133,7 +134,7 @@
         }
         if (tick != null) {
           tick.color(tickColor);
-          this.addChild(tick);
+          outputs.push(tick);
         }
 
         // Draw the tick label
@@ -175,7 +176,7 @@
             tickLabel.pivot(0, -1).shift(coord, sfig.downSign * tickLabelPadding);
           else  // y-axis
             tickLabel.pivot(1, 0).shift(-tickLabelPadding, coord);
-          this.addChild(tickLabel);
+          outputs.push(tickLabel);
         }
       }
 
@@ -188,8 +189,10 @@
           this.axisLabelBlock.pivot(0, -1).shiftBy(length / 2, axisLabelPadding);
         else  // y-axis
           this.axisLabelBlock.pivot(1, 0).shiftBy(-axisLabelPadding, -length / 2);
-        this.addChild(this.axisLabelBlock);
+        outputs.push(this.axisLabelBlock);
       }
+
+      this.addChild(overlay(...outputs));
     }
 
     this.createDataChildren();
