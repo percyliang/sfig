@@ -2832,7 +2832,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.body = sfig.ytable.apply(null, this.contents).ymargin(this.bodySpacing());
     this.body.dim(this.innerWidth(), this.bodyHeight().mul(this.bodyFrac()));
     this.body.setEnd(this);
-    //this.border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
     // Draw the border as individual lines rather than a rectangle.  This means
     // that the interior of the slide is not part of the border, so clicking or
     // entering it doesn't trigger any events on the border.  This is to work
@@ -2840,14 +2839,16 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // elements to be hidden and accidentally clicking on the interior shows
     // everything at once.  However, we won't be able to set the color of the
     // background.
+    function down(x) { return x.mul(sfig.downSign); }
     function hollowRect(width, height, strokeWidth) {
-      const corners = [[0, 0], [width, 0], [width, height], [0, height]];
+      const corners = [[0, 0], [width, 0], [width, down(height)], [0, down(height)]];
       const lines = [0, 1, 2, 3].map((i) => {
         return sfig.line(corners[i], corners[(i + 1) % corners.length]).strokeWidth(strokeWidth);
       });
       return sfig.overlay.apply(null, lines);
     }
     this.border = hollowRect(this.width(), this.height(), this.borderWidth());
+    //this.border = sfig.rect(this.width(), this.height()).strokeWidth(this.borderWidth());
     this.border.setEnd(this);
   };
   sfig_.inheritsFrom('Slide', Slide, sfig.Block);
