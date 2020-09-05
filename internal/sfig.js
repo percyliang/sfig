@@ -3497,6 +3497,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var self = this;
     if (callback == null) callback = function() {};
 
+    if (sfig_.urlParams.defaultMouseShowHide) {
+      sfig.setLaserPointerCursor();
+    }
+
     if (this.slides.length == 0) sfig.throwException('No slides');
     if (!sfig_.initialized) sfig.throwException('Must call sfig.initialize() first');
 
