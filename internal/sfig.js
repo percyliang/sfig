@@ -3198,7 +3198,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       window.location.reload();
     });
 
-    this.registerKey('Toggle listening mode', ['shift-n'], function(callback) {
+    this.registerKey('Toggle listening mode (turn on for non-projected screen, show next slide)', ['shift-n'], function(callback) {
       if (sfig_.urlParams.listen) {
         delete sfig_.urlParams.listen;
       } else {
@@ -3213,6 +3213,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
       sfig_.performOperation('renderAll', function(modifiedCallback) {
         self.renderAllSlides(modifiedCallback);
       }, callback);
+    });
+
+    this.registerKey('Show keyboard shortcuts', ['shift-/'], function(callback) {
+      alert(self.getHelpText());
     });
 
     // Set up key bindings
@@ -3280,6 +3284,16 @@ sfig.down = function(x) { return x * sfig.downSign; };
       'Key bindings'.bold(),
       new sfig.Table(rows).xjustify('rl').xmargin(15),
     _).center().ymargin(10).scale(0.8);
+  }
+
+  Presentation.prototype.getHelpText = function() {
+    const header = [
+      '--- Key bindings ---',
+    ];
+    const rows = this.keyBindings.map(function(binding) {
+      return binding.keys.join(' | ') + ': ' + binding.description;
+    });
+    return header.concat(rows).join('\n');
   }
 
   Presentation.prototype.readyForSlideShowKey = function() {
