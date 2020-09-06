@@ -3198,6 +3198,16 @@ sfig.down = function(x) { return x * sfig.downSign; };
       window.location.reload();
     });
 
+    this.registerKey('Toggle listening mode', ['shift-n'], function(callback) {
+      if (sfig_.urlParams.listen) {
+        delete sfig_.urlParams.listen;
+      } else {
+        sfig_.urlParams.listen = true;
+      }
+      self.updateUrlParams();
+      window.location.reload();
+    });
+
     this.registerKey('Render all slides, caching results', ['shift-r'], function(callback) {
       if (!self.readyForSlideShowKey()) return callback();
       sfig_.performOperation('renderAll', function(modifiedCallback) {
@@ -3455,6 +3465,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
     }
     sfig_.urlParams.level = self.currLevel;
     sfig_.serializeUrlParamsToLocation();
+    if (!sfig_.urlParams.listen) {
+      sfig_.sendUrlParams();
+    }
   }
 
   // When file initially loads, jump to the right place.
@@ -3493,12 +3506,44 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
   sfig_.maxLevel = 10000;
 
+  // Allow communication of urlParams to other windows that have the same slide
+  // presentation open (to allow for speaker notes).
+  sfig_.sendUrlParams = function() {
+    localStorage.setItem('urlParams', JSON.stringify(sfig_.urlParams));
+  }
+  sfig_.receiveUrlParams = function() {
+    return JSON.parse(localStorage.getItem('urlParams'));
+  }
+
   Presentation.prototype.run = function(callback) {
     var self = this;
     if (callback == null) callback = function() {};
 
     if (sfig_.urlParams.defaultMouseShowHide) {
       sfig.setLaserPointerCursor();
+    }
+
+    function listenHandler() {
+      // Another presentation is tell us where they are.  Note: the
+      // presentation is keyed by the file path, so if the same path
+      // (e.g., index.html) is used for multiple presentations,
+      // there will be conlicts but only while you're presenting.
+      let {slideIndex, slideId} = sfig_.receiveUrlParams();
+      // Show next slide after that (which could be notes or the
+      // next slide) so that we're ready.
+      if (slideId) {
+        slideIndex = prez.slideIdToSlideIndex(slideId) + 1;
+        if (slideIndex < prez.slides.length) {
+          slideId = prez.slides[slideIndex].id().get();
+          self.setSlideIdAndLevel(slideId, null, callback);
+        }
+      } else if (slideIndex) {
+        slideIndex = slideIndex + 1;
+        self.setSlideIdAndLevel(slideIndex, null, callback);
+      }
+    }
+    if (sfig_.urlParams.listen) {
+      setInterval(listenHandler, 500);
     }
 
     if (this.slides.length == 0) sfig.throwException('No slides');
