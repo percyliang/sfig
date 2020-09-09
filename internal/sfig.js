@@ -1179,6 +1179,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
             recursivelyShowHide(ancestorElem, hide);
           }
         };
+      }
+
+      if (isLeaf(elem)) {
         return;
       }
 
