@@ -938,6 +938,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   Block.prototype.numLevels = function(n) { return this.hideLevel(this.showLevel().add(n)); } // How long to display this object
 
   sfig_.addProperty(Block, 'mouseShowHide', null, 'When mouse enters, show/hide when shift-key is not pressed/pressed.');
+  sfig_.addProperty(Block, 'atomicMouseShowHide', null, 'When mouse over any part of this block, show everything');
 
   sfig_.addProperty(Block, 'orphan', null, 'Orphans do not contribute to the bounding box of its parent.');
   sfig_.addPairProperty(Block, 'parentPivot', 'xparentPivot', 'yparentPivot', null, null, 'Pivot used by parent.');
@@ -1047,6 +1048,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // If this is set, then we initially set the opacity and then clear it when
     // mouse enters with the shift key.
     const mouseShowHide = this.mouseShowHide().exists() ? this.mouseShowHide().get() : sfig_.urlParams.defaultMouseShowHide;
+    const atomicMouseShowHide = this.atomicMouseShowHide().get();
 
     const strokeColor = this.strokeColor().get();
     const fillColor = this.fillColor().get();
@@ -1146,34 +1148,37 @@ sfig.down = function(x) { return x * sfig.downSign; };
         setStyle(elem, 'strokeWidth', null, strokeWidth, sfig.defaultStrokeWidth);
         setStyle(elem, 'strokeDasharray', null, strokeDasharray && strokeDasharray.join(' '), null);
 
-        setStyle(elem, 'strokeOpacity', 'opacity', mouseShowHide ? sfig.defaultVeilOpacity : strokeOpacity);
-        setStyle(elem, 'fillOpacity', 'opacity', mouseShowHide ? sfig.defaultVeilOpacity : fillOpacity);
+        setStyle(elem, 'strokeOpacity', 'opacity', strokeOpacity);
+        setStyle(elem, 'fillOpacity', 'opacity', fillOpacity);
+      }
 
-        if (mouseShowHide) {
-          // Set the true strokeOpacity and fillOpacity when mouse enters
-          elem.onmouseenter = function(e) {
-            if (e.ctrlKey) {  // Allows us to move over regions without making changes
-              return;
-            }
-            const hide = e.shiftKey;
+      // We attach a mouseenter event to hide/show elements.  If
+      // atomicMouseShowHide, then do it only at the root.  Otherwise, do it
+      // only at the leaves.
+      if (mouseShowHide && (atomicMouseShowHide ? isTop : isLeaf(elem))) {
+        // Set the true strokeOpacity and fillOpacity when mouse enters
+        elem.onmouseenter = function(e) {
+          if (e.ctrlKey) {  // Allows us to move over regions without making changes
+            return;
+          }
+          const hide = e.shiftKey;
+          recursivelyShowHide(ancestorElem, hide);
+        };
+
+        let ancestorElem = elem;  // Keep track of ancestor
+        // If click, then move `ancestorElem` up and apply show/hide to that.
+        elem.onclick = function(e) {
+          const hide = e.shiftKey;
+          // Go up unary chains
+          while (ancestorElem.parentElement && ancestorElem.parentElement.childElementCount === 1) {
+            ancestorElem = ancestorElem.parentElement;
+          }
+          // Go up one level
+          if (ancestorElem.parentElement) {
+            ancestorElem = ancestorElem.parentElement;
             recursivelyShowHide(ancestorElem, hide);
-          };
-
-          let ancestorElem = elem;  // Keep track of ancestor
-          // If click, then move `ancestorElem` up and apply show/hide to that.
-          elem.onclick = function(e) {
-            const hide = e.shiftKey;
-            // Go up unary chains
-            while (ancestorElem.parentElement && ancestorElem.parentElement.childElementCount === 1) {
-              ancestorElem = ancestorElem.parentElement;
-            }
-            // Go up one level
-            if (ancestorElem.parentElement) {
-              ancestorElem = ancestorElem.parentElement;
-              recursivelyShowHide(ancestorElem, hide);
-            }
-          };
-        }
+          }
+        };
         return;
       }
 
@@ -1216,6 +1221,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
       wrapSpans(this.elem);
     }
     recursivelySetStyles(this.elem, true, sfig.defaultStrokeColor);
+    if (mouseShowHide) {
+      recursivelyShowHide(this.elem, true);
+    }
   }
 
   // Call this function when change properties of this Block and want to propagate to elem.
@@ -3848,6 +3856,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
     var head = document.head;
     var script = sfig_.newElem('script');
     script.src = src;
+    script.async = false;  // Otherwise multiple calls to this won't load scripts in the right order
     head.appendChild(script);
     return script;
   }

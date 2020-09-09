@@ -192,7 +192,7 @@
         outputs.push(this.axisLabelBlock);
       }
 
-      this.addChild(overlay(...outputs));
+      this.addChild(overlay(...outputs).atomicMouseShowHide(true));
     }
 
     this.createDataChildren();
