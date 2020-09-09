@@ -3553,7 +3553,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
         }
       } else if (slideIndex) {
         slideIndex = slideIndex + 1;
-        self.setSlideIdAndLevel(slideIndex, null, callback);
+        self.setSlideIndexAndLevel(slideIndex, null, callback);
       }
     }
     if (sfig_.urlParams.listen) {
