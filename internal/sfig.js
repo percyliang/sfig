@@ -1215,6 +1215,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
         setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
         return;
       }
+      if (elem.hasAttribute('showHideIgnore')) {
+        return;
+      }
       for (let child of elem.children) {
         recursivelyShowHide(child, hide);
       }
@@ -1226,6 +1229,10 @@ sfig.down = function(x) { return x * sfig.downSign; };
     recursivelySetStyles(this.elem, true, sfig.defaultStrokeColor);
     if (mouseShowHide) {
       recursivelyShowHide(this.elem, true);
+    } else {
+      // Set this flag so that an ancestor that has mouseShowHide = true will
+      // not hide this element in recursivelyShowHide().
+      this.elem.setAttribute('showHideIgnore', '');
     }
   }
 
@@ -1498,7 +1505,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.elem.style.pointerEvents = 'all';
 
     // Add additional properties
-    // TODO: works in Chrome, but doesn't work in Firefox
     if (this.tooltip().get() != null) sfig_.addTooltipToElem(this.elem, this.tooltip().get());
     if (this.onClick().get() != null) this.elem.onclick = sfig_.funcPrependArg(this.onClick().get(), this);
     if (this.onDblclick().get() != null) this.elem.ondblclick = sfig_.funcPrependArg(this.onDblclick().get(), this);
@@ -2910,10 +2916,23 @@ sfig.down = function(x) { return x * sfig.downSign; };
     this.addChild(titleBody);
 
     // Add headers and footers
-    if (this.leftHeader().exists()) this.addChild(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shiftBy(this.headerPadding(), this.headerPadding()).scale(this.headerScale()).showLevel(0));
-    if (this.rightHeader().exists()) this.addChild(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shiftBy(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()).showLevel(0));
-    if (this.leftFooter().exists()) this.addChild(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shiftBy(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
-    if (this.rightFooter().exists()) this.addChild(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shiftBy(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    const cornerBlocks = [];
+    if (this.leftHeader().exists()) cornerBlocks.push(sfig.transform(this.leftHeader().getOrDie()).pivot(-1, -1).shiftBy(this.headerPadding(), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.rightHeader().exists()) cornerBlocks.push(sfig.transform(this.rightHeader().getOrDie()).pivot(+1, -1).shiftBy(this.width().sub(this.headerPadding()), this.headerPadding()).scale(this.headerScale()).showLevel(0));
+    if (this.leftFooter().exists()) cornerBlocks.push(sfig.transform(this.leftFooter().getOrDie()).pivot(-1, +1).shiftBy(this.footerPadding(), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    if (this.rightFooter().exists()) cornerBlocks.push(sfig.transform(this.rightFooter().getOrDie()).pivot(+1, +1).shiftBy(this.width().sub(this.footerPadding()), this.height().sub(this.footerPadding())).scale(this.footerScale()).showLevel(0));
+    for (let corner of cornerBlocks) {
+      this.addChild(corner);
+    }
+
+    // Always show title and corners even in mouse show/hide mode by default
+    this.border.recMouseShowHide(false, true);
+    if (this.titleBlock) {
+      this.titleBlock.recMouseShowHide(false, true);
+    }
+    for (let corner of cornerBlocks) {
+      corner.recMouseShowHide(false, true);
+    }
 
     var extra = this.extra().get();
     if (extra != null) this.addChild(sfig.std(extra));
