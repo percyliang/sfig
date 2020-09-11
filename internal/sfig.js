@@ -1820,6 +1820,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.text = function(content) { return new Text().content(content); }
   sfig.bulletedText = function(content) { return sfig.text(content).bulleted(true); }
   sfig.nowrapText = function(content) { return sfig.text(content).autowrap(false); }
+  sfig.atomicText = function(content) { return sfig.text(content).atomicMouseShowHide(true); }
+  sfig.atomicBulletedText = function(content) { return sfig.text(content).bulleted(true).atomicMouseShowHide(true); }
   sfig.chineseText = function(content) { return sfig.text(content).language('chinese'); }
   sfig.arabicText = function(content) { return sfig.text(content).language('arabic'); }
 })();
@@ -2363,7 +2365,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig_.addPairProperty(DecoratedLine, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Whether to draw an arrow at the two ends of the line');
   sfig_.addProperty(DecoratedLine, 'label', null, 'Label to draw');
 
-  sfig.decoratedLine = function(arg1, arg2) { return new DecoratedLine().line.arg1(arg1).arg2(arg2).end; }
+  sfig.decoratedLine = function(arg1, arg2) { return new DecoratedLine().line.arg1(arg1).arg2(arg2).end.atomicMouseShowHide(true); }
   sfig.arrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2).drawArrow(false, true); }
   sfig.doubleArrow = function(arg1, arg2) { return sfig.decoratedLine(arg1, arg2).drawArrow(true, true); }
 
