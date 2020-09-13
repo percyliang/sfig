@@ -1048,7 +1048,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
     // If this is set, then we initially set the opacity and then clear it when
     // mouse enters with the shift key.
     const mouseShowHide = this.mouseShowHide().exists() ? this.mouseShowHide().get() : sfig_.urlParams.defaultMouseShowHide;
-    const atomicMouseShowHide = this.atomicMouseShowHide().get();
+    // For text, default to atomic
+    const atomicMouseShowHide = this.atomicMouseShowHide().exists() ? this.atomicMouseShowHide().get() : (this instanceof sfig.Text);
 
     const strokeColor = this.strokeColor().get();
     const fillColor = this.fillColor().get();
@@ -1820,8 +1821,6 @@ sfig.down = function(x) { return x * sfig.downSign; };
   sfig.text = function(content) { return new Text().content(content); }
   sfig.bulletedText = function(content) { return sfig.text(content).bulleted(true); }
   sfig.nowrapText = function(content) { return sfig.text(content).autowrap(false); }
-  sfig.atomicText = function(content) { return sfig.text(content).atomicMouseShowHide(true); }
-  sfig.atomicBulletedText = function(content) { return sfig.text(content).bulleted(true).atomicMouseShowHide(true); }
   sfig.chineseText = function(content) { return sfig.text(content).language('chinese'); }
   sfig.arabicText = function(content) { return sfig.text(content).language('arabic'); }
 })();
