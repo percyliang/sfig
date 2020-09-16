@@ -457,6 +457,13 @@ function isLeaf(block) {
       content = content.replace(/<ins>/g, '\\uline{');
       content = content.replace(/<span style="font-variant:small-caps">/, '\\textsc{');
 
+      // Remove hyperlinks
+      var m = content.match(/^(.*)<a href="([^\"]+)">([^<]*)<\/a>(.*)/);
+      if (m) {
+        // Remove the link
+        content = m[1] + m[3] + m[4];
+      }
+
       // Replace colors with canonical versions
       while (true) {
         var m = content.match(/^(.*)<font color="([^>]+)">(.*)/);

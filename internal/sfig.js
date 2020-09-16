@@ -115,7 +115,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
   sfig.setLaserPointerCursor = function() {  // Change default cursor
     if (sfig.serverSide) return;
-    sfig.defaultCursor = 'url("'+sfig.getInternalDir()+'/../images/red-dot.png"), auto';
+    sfig.defaultCursor = 'url("'+sfig.getInternalDir()+'/../images/red-pencil.png"), auto';
     sfig.resetCursor();
   }
 
@@ -3832,9 +3832,9 @@ sfig.down = function(x) { return x * sfig.downSign; };
   }
 
   // Define convenient macros and functions for the common colors
-  function colorFunc(color) { return function(x) { return x.fontcolor(color); } }
-  function colorBoldFunc(color) { return function(x) { return x.fontcolor(color).bold(); } }
-  function colorItalicsFunc(color) { return function(x) { return x.fontcolor(color).italics(); } }
+  function colorFunc(color) { return function(x) { return x.toString().fontcolor(color); } }
+  function colorBoldFunc(color) { return function(x) { return x.toString().fontcolor(color).bold(); } }
+  function colorItalicsFunc(color) { return function(x) { return x.toString().fontcolor(color).italics(); } }
   for (var name in sfig._colorMap) {
     var color = sfig._colorMap[name];
     sfig.colorLatexMacro(name, color);

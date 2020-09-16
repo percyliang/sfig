@@ -240,6 +240,10 @@
   Graph.prototype.yvalueToCoord = function(value) {
     return -sfig.downSign * this.ylength().getOrDie() * (value - this.yminValue().getOrDie()) / (this.ymaxValue().getOrDie() - this.yminValue().getOrDie());
   }
+  Graph.prototype.xyValueToCoord = function(xy) {
+    const [x, y] = xy;
+    return [this.xvalueToCoord(x), this.yvalueToCoord(y)];
+  }
 
   // Trajectory
   sfig_.addProperty(Graph, 'trajectoryNames', null, 'Trajectory names');
