@@ -1151,6 +1151,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
 
         setStyle(elem, 'strokeOpacity', 'opacity', strokeOpacity);
         setStyle(elem, 'fillOpacity', 'opacity', fillOpacity);
+        if (strokeOpacity) {
+          elem.setAttribute('originalStrokeOpacity', strokeOpacity);
+        }
+        if (fillOpacity) {
+          elem.setAttribute('originalFillOpacity', fillOpacity);
+        }
       }
 
       // We attach a mouseenter event to hide/show elements.  If
@@ -1202,7 +1208,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
         // Note: use defaultOpacity rather than true opacity from the Block
         // properties (which we don't have, since this function might be called
         // beyond the Block).
-        const defaultOpacity = '';
+        const strokeOpacity = elem.getAttribute('originalStrokeOpacity') || '';
+        const fillOpacity = elem.getAttribute('originalFillOpacity') || '';
 
         // There's a bug in Firefox (but not Chrome) where we have
         // overlay(rect(...), X) and entering the larger rect makes X
@@ -1212,8 +1219,8 @@ sfig.down = function(x) { return x * sfig.downSign; };
         // Don't pass `defaultOpacity` in as a `defaultValue` since we want
         // to override the existing value (which was set to
         // sfig.defaultVeilOpacity), whereas `defaultValue` wouldn't do that.
-        setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
-        setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : defaultOpacity);
+        setStyle(elem, 'strokeOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : strokeOpacity);
+        setStyle(elem, 'fillOpacity', 'opacity', hide ? sfig.defaultVeilOpacity : fillOpacity);
         return;
       }
       if (elem.hasAttribute('showHideIgnore')) {

@@ -317,6 +317,7 @@
 
       var trajectory = this.trajectories[i];
 
+      const trajectoryBlocks = [];
       var lastq = null;
       trajectory.forEach(function(p) {
         var q = [self.xvalueToCoord(p.x), self.yvalueToCoord(p.y)];
@@ -328,7 +329,7 @@
           segment.strokeWidth(lineWidth);
           if (lineDasharrays[i])
             segment.strokeDasharray(lineDasharrays[i]);
-          self.addChild(segment);
+          trajectoryBlocks.push(segment);
         }
 
         // Create marker
@@ -336,11 +337,12 @@
           var marker = createMarker(i, trajectoryColors[i] || 'black');
           marker.shift(q[0], q[1]);
           marker.tooltip(p.x + ',' + p.y);
-          self.addChild(marker);
+          trajectoryBlocks.push(marker);
           self.addValueLabel(p.y, i, marker);
         }
         lastq = q;
       });
+      self.addChild(overlay(...trajectoryBlocks).atomicMouseShowHide(true));
     }
   };
 
