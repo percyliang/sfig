@@ -54,7 +54,7 @@
     if (!(this.head instanceof sfig.Block)) sfig.throwException('Head must be Block, but got: '+this.head);
 
     // Center the head in the middle between center of the first and the last children heads
-    this.headBox = frame(this.head).bg.round(this.nodeRound()).end;
+    this.headBox = frame(this.head).bg.round(this.nodeRound()).end.atomicMouseShowHide(true);
     this.headBox.bg.level(this.head.showLevel(), this.head.hideLevel());
     this.headBox.setEnd(this);
     this.headBox.padding(this.nodePadding());
@@ -98,11 +98,12 @@
         b.edge.line.b2(b.child.headBox);
       }
       b.edge.drawArrow1(this.drawArrow1()).drawArrow2(this.drawArrow2());
-      this.addChild(b.edge);
+      b.edge.strokeWidth(this.edgeStrokeWidth());
+      this.addChild(b.edge.atomicMouseShowHide(true));
 
       // Edge label
       if (b.edgeLabel != null) {
-        var edgeLabel = sfig.center(b.edgeLabel).shift(b.edge.xmiddle(), b.edge.ymiddle());
+        var edgeLabel = sfig.center(b.edgeLabel).shift(b.edge.xmiddle(), b.edge.ymiddle()).atomicMouseShowHide(true);
         edgeLabel.mimic(b.child.head);
         this.addChild(edgeLabel);
       }
@@ -115,6 +116,7 @@
   sfig_.addProperty(RootedTree, 'nodePadding', 3, 'Amount of space inside a node');
   sfig_.addProperty(RootedTree, 'nodeBorderWidth', 1, 'How thick to make node');
   sfig_.addProperty(RootedTree, 'nodeRound', 5, 'How rounded are the nodes?');
+  sfig_.addProperty(RootedTree, 'edgeStrokeWidth', 1, 'How thick to make the edges');
   sfig_.addPairProperty(RootedTree, 'drawArrow', 'drawArrow1', 'drawArrow2', null, null, 'Are the edges directed (up, down)?');
   sfig_.addProperty(RootedTree, 'verticalCenterEdges', null, 'For drawing parse trees, have edges converge');
   sfig_.addProperty(RootedTree, 'tail', null, 'Draw this after everything');
