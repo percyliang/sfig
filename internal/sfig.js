@@ -1146,7 +1146,12 @@ sfig.down = function(x) { return x * sfig.downSign; };
         } else {
           setStyle(elem, 'fill', 'backgroundColor', fillColor, sfig.defaultFillColor);
         }
-        setStyle(elem, 'strokeWidth', null, strokeWidth, sfig.defaultStrokeWidth);
+        if (!elem.attributes['stroke-width']) {
+          // For some elements like `line` (which shows up with $\boxed{...}$,
+          // stroke-width is already set, so don't override it or else the box
+          // disappears.
+          setStyle(elem, 'strokeWidth', null, strokeWidth, sfig.defaultStrokeWidth);
+        }
         setStyle(elem, 'strokeDasharray', null, strokeDasharray && strokeDasharray.join(' '), null);
 
         setStyle(elem, 'strokeOpacity', 'opacity', strokeOpacity);
