@@ -33,6 +33,8 @@ sfig.enableTiming = false;  // Enable to see how long it takes to render.
 sfig.enableProfiling = false;  // Enable to see where CPU is being spent.
 sfig.enableMouseWheel = true;  // Whether allow mouse wheel to scroll
 
+sfig.missingPaths = [];  // Will be filled up with image paths that we can't load
+
 sfig.wideScreen = function() {
   const s = 0.65;  // Scale to make it more compatible with the default 800x600 screen
   sfig.Slide.defaults.setProperty('width', 1600 * s);
@@ -2055,6 +2057,7 @@ sfig.down = function(x) { return x * sfig.downSign; };
       var self = this;
       img.onerror = function() {
         sfig.L('Unable to load: ' + path);
+        sfig.missingPaths.push(path);
         self.elem = sfig_.newSvgElem('image');
         callback();
       }
