@@ -21,6 +21,4 @@ do
 	*) continue ;;
     esac
 done
-exec pdfjam --fitpaper true --rotateoversize true --suffix joined "$@"
-
-
+exec pdfjam --fitpaper true --rotateoversize false --suffix joined "$@"
