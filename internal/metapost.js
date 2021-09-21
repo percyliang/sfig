@@ -458,7 +458,7 @@ function isLeaf(block) {
       content = content.replace(/<span style="font-variant:small-caps">/, '\\textsc{');
 
       // Remove hyperlinks
-      var m = content.match(/^(.*)<a href="([^\"]+)">([^<]*)<\/a>(.*)/);
+      var m = content.match(/^(.*)<a href="([^\"]+)">([^<]*)<\/a>(.*)/m);
       if (m) {
         // Remove the link
         content = m[1] + m[3] + m[4];
@@ -466,7 +466,7 @@ function isLeaf(block) {
 
       // Replace colors with canonical versions
       while (true) {
-        var m = content.match(/^(.*)<font color="([^>]+)">(.*)/);
+        var m = content.match(/^(.*)<font color="([^>]+)">(.*)/m);
         if (!m) break;
         m[2] = m[2].replace(/\\#/, '#');  // Undo escape of #
         content = m[1] + '\\textcolor{' + sfig._canonicalColor(m[2]) + '}{' + m[3];
