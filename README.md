@@ -4,10 +4,8 @@ sfig
 SVG/Javascript-based library for creating presentations/figures.
 
 To get an overview of the functionality and try sfig out interactively, point
-your web browser to:
+your web browser to this [tutorial](http://cs.stanford.edu/~pliang/sfig/examples/tutorial.html).
 
-    http://cs.stanford.edu/~pliang/sfig/examples/tutorial.html
-    
 The list of all classes and methods can be referenced from the [Wiki](https://github.com/percyliang/sfig/wiki).
 
 After you've downloaded sfig, create a presentation by typing:

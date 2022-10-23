@@ -10,6 +10,7 @@ sfig.importMethods(this, [
   'bulletedText', 'line', 'arrow',
 ]);
 sfig.initialize();
+sfig.wideScreen();
 
 sfig.Text.defaults.setProperty('fontSize', 18);
 sfig.TextBox.defaults.setProperty('fontSize', 14);
@@ -23,7 +24,7 @@ function add(block) { slideNum++; prez.addSlide(block.rightFooter(slideNum)); }
 function example(code, options) {
   var target = wrap(eval(code));
   var numRows = (options && options.numRows) || code.split('\n').length;
-  return frame(xtable(
+  return parentCenter(frame(xtable(
     textBox().multiline(true).size(50, numRows).content(code).onEnter(function(box) {
       var input = box.content().get();
       var output = eval(input);
@@ -32,7 +33,7 @@ function example(code, options) {
     }),
     sfig.rightArrow(50).strokeWidth(5).color('brown'),
     frame(target).padding(5).bg.strokeWidth(1).strokeColor('gray').end,
-  _).xmargin(20).center()).padding(10);
+  ).xmargin(20).center()).padding(10));
 }
 
 prez.addSlide(slide('',
@@ -42,7 +43,7 @@ prez.addSlide(slide('',
   'You can edit the Javascript code (e.g., try changing the color to red) and press ctrl-enter to see the updated result.',
   'Use the arrow keys to move between slides.',
   text('Download the code from GitHub.'.fontcolor('blue')).linkToUrl('http://github.com/percyliang/sfig'),
-_).id('title'));
+).id('title'));
 
 add(slide('Why sfig?',
   'As motivation, consider the task of drawing nodes with labels inside:',
@@ -50,7 +51,7 @@ add(slide('Why sfig?',
   '<b>Factor out form and content</b>: figures often have recurring elements which display different content in the same form (e.g., circled nodes).  Using code, we can define the form <em>once</em> in a function and use it with different content (e.g., <tt>node(\'algorithm\')</tt>, <tt>node(\'graph\')</tt>).',
   '<b>Relative layout</b>: creating figures by code would be tedious if we had to specify the absolute sizes/positions of all the elements.  sfig offers constructs (e.g., <tt>overlay</tt>, <tt>xtable</tt>) to specify control layout in a higher-level way.',
   '<b>MathJax integration</b>: Embed $\\LaTeX$ seamlessly into your figures.',
-_));
+));
 
 add(slide('Blocks and properties',
   'The basic unit in sfig is called a <b>Block</b> (includes text, circles, rectangles, etc.). A Block has various properties which specifies all the information to render into an SVG element.',
@@ -60,7 +61,7 @@ add(slide('Blocks and properties',
   example("square(40).scale(0.8).rotate(45)"),
   'Properties can be also overridden:',
   example("ellipse(40, 20).xradius(10)"),
-_));
+));
 
 add(slide('Text',
   'By default, strings are converted into Text Blocks:',
@@ -71,7 +72,15 @@ add(slide('Text',
   example("text(['Shapes:',\n  'circle', 'square']).bulleted(true)"),
   'Importantly, we can embed LaTeX (rendered using MathJax):',
   example("'$\\\\frac{\\\\sin(\\\\alpha)}{\\\\cos(\\\\alpha)}$'"),
-_));
+));
+
+add(slide('Interactive math',
+  'Math can be dense and hard to process, so it\'s useful to be able to walk through it slowly.',
+  'That\'s why writing math on the board is so much more pleasant than breezing through it on slides.',
+  'But with sfig, you can simulate writing math on the board in slides.',
+  'Press shift-m to toggle mouse show/hide mode and then move your mouse over the equation below.',
+  parentCenter(text('$\\text{KL}(p || q) = \\int p(x) \\log \\frac{p(x)}{q(x)} dx$').atomicMouseShowHide(false).scale(2)),
+).id('interactive-math'));
 
 add(slide('Multiple objects',
   'So far we have created one Block at a time.  Much of the richness of sfig comes from now Blocks are combined.',
@@ -79,7 +88,7 @@ add(slide('Multiple objects',
   example("a = circle(20)\nb = circle(20).shift(60, 0)\noverlay(a, b)"),
   'However, this often requires specifying absolute positions, which can be quite tedious.  The second way is to use a <b>Table</b>:',
   example("a = circle(20)\nb = circle(20).shift(60, 0)\nxtable(a, b).margin(20)"),
-_));
+));
 
 add(slide('Overlays',
   'Note that each Block has an origin (for a circle, it\'s the center; for a square, it\'s the top-left corner).',
@@ -90,7 +99,7 @@ add(slide('Overlays',
   example("a = square(20).strokeColor('red')\nb = square(40).strokeColor('blue')\noverlay(a, b).pivot(0, 0)"),
   'Or around the bottom middle:',
   example("a = square(20).strokeColor('red')\nb = square(40).strokeColor('blue')\noverlay(a, b).pivot(0, 1)"),
-_));
+));
 
 add(slide('Tables',
   'A Table is built from a two-dimensional matrix of Blocks.',
@@ -100,14 +109,14 @@ add(slide('Tables',
   'We can re-justify (l is left, c is center, r is right):',
   example("table(['cat', 'dog'], ['caterpillar', circle(30)])\n  .margin(10).justify('cl', 'r')"),
   'The first argument (cl) corresponds to the x-axis and the second (r) to the y-axis.',
-_))
+))
 
 add(slide('Referencing other Blocks',
   'sfig tries hard to avoid absolute references. We saw that Tables and Overlays are constructs that position Blocks relative to each other, but these relations are only with respect to a given hierarchy.',
   'We can also create relative references more directly as follows inside an Overlay:',
   example("c = circle(20)\nl = center('C')\n  .shift(c.right().add(8), c.ymiddle())\noverlay(c, l)"),
   'Note that the position of the label depends dynamically on that of c, which critically might not be known when the Blocks are constructed.',
-_));
+));
 
 add(slide('Referencing other Blocks (continued)',
   'Another example (note that it would be hard to get the absolute size of the text):',
@@ -115,7 +124,7 @@ add(slide('Referencing other Blocks (continued)',
   'We can also access the width and height (the real prefix refers to what\'s actually rendered):',
   example("t = text('hello world')\nl = text(t.realWidth().add(' ')\n    .add(t.realHeight()))\nytable(t, l)"),
   'Under the hood, all properties (t.strokeColor(), t.left()) are <b>Thunk</b> objects, which encapsulate the lazy computation of their values.',
-_));
+));
 
 add(slide('Links',
   'We can attach hyperlinks to internal slides:',
@@ -124,18 +133,18 @@ add(slide('Links',
   example("text('Go to simple presentation')\n  .linkToExternal('simple-presentation')"),
   'Or different URLs:',
   example("text('Google').linkToUrl('http://www.google.com')"),
-_));
+));
 
 add(slide('Events',
   'We can attach the usual events to Blocks:',
   example("circle(30).onClick(function() {\n  alert('Clicked')\n})"),
-_));
+));
 
 add(slide('Animation',
   'Every Block has an <b>Animate</b> object, which contains the set of properties to be animated from.',
   'For example, to fade something in:',
   example("circle(20).color('blue').animate.opacity(0).end"),
-_));
+));
 
 function equationEditor() {
   var example = '\\alpha^2';
@@ -147,7 +156,7 @@ function equationEditor() {
       prez.refresh(function() { box.textElem.focus(); });
     }),
     target,
-  _).center().ymargin(10));
+  ).center().ymargin(10));
 }
 
 function timeSeriesPlotter() {
@@ -187,7 +196,7 @@ function timeSeriesPlotter() {
       prez.refresh(function() { box.textElem.focus(); });
     }),
     target,
-  _).center().ymargin(10));
+  ).center().ymargin(10));
 }
 
 add(slide('Example Tools',
@@ -198,12 +207,12 @@ add(slide('Example Tools',
 
   '<b>Plot time series</b> (format is "name $x_1$ $x_2$..." or "$x_1$ $y_1$\\n$x_2$ $y_2$\\n..."):',
   timeSeriesPlotter(),
-_));
+));
 
 add(slide('Drawing Rooted Trees',
   'sfig can be used to draw trees (e.g., for syntax):',
   example("T = sfig.rootedTree\nB = sfig.rootedTreeBranch\nnp = T('NP', T('N', 'I'))\nvp = T('VP', T('V', 'like'), T('N', 'cheese'))\ntree = T('S', np, vp)\ntree.recverticalCenterEdges(true)\ntree.recnodeBorderWidth(0).recnodePadding(0)"),
-_));
+));
 
 add(slide('From Blocks to SVG elements',
   bulletedText([null,
@@ -221,10 +230,10 @@ add(slide('From Blocks to SVG elements',
       'Rendering [<tt>c.renderElem(...)</tt> sets <tt>c.elem</tt> and properties such as realWidth]',
     ],
   ]),
-_));
+));
 
 add(slide('To be completed...',
-  bulletedText([null, 'Level', 'Slide', 'Frame', 'Transform', 'RootedTree', 'Graph', 'd3']), 
-_));
+  bulletedText([null, 'Level', 'Slide', 'Frame', 'Transform', 'RootedTree', 'Graph', 'd3']),
+));
 
 function onLoad() { prez.run(); }
