@@ -75,10 +75,7 @@ add(slide('Text',
 ));
 
 add(slide('Interactive math',
-  'Math can be dense and hard to process, so it\'s useful to be able to walk through it slowly.',
-  'That\'s why writing math on the board is so much more pleasant than breezing through it on slides.',
-  'But with sfig, you can simulate writing math on the board in slides.',
-  'Press shift-m to toggle mouse show/hide mode and then move your mouse over the equation below.',
+  'Math can be dense and hard to process, so it\'s useful to be able to walk through it slowly.  That\'s why writing math on the board is so much more pleasant than breezing through it on slides.  But with sfig, you can now simulate writing math on the board in slides. To try it out, press shift-m to toggle mouse show/hide mode and then move your mouse over the equation below.  Hold down shift to erase and ctrl to "lift" your pen.',
   parentCenter(text('$\\text{KL}(p || q) = \\int p(x) \\log \\frac{p(x)}{q(x)} dx$').atomicMouseShowHide(false).scale(2)),
 ).id('interactive-math'));
 
